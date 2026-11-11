@@ -12,7 +12,7 @@
   <a href="https://gitee.com/puci1/Shark/releases/tag/v2.4.1"><img src="docs/badges/gitee.svg" alt="Gitee"></a>
 </p>
 
-Shark 支持 OnePlus、OPPO、Realme、iQOO 等设备，不用解锁 BL，起手只需要
+Shark 支持 OnePlus、OPPO、Realme、iQOO、Motorola 等设备，不用解锁 BL，起手只需要
 adb shell；App 通过 Stellar 或 Shizuku 驱动设备端 exploit，拿到临时内核
 权限后按所选管理器加载 LKM，最终得到 KernelSU、KernelSU-Next、BakaSU、
 SukiSU Ultra 或 FinaSU 的 root 环境。
@@ -62,6 +62,7 @@ SukiSU Ultra 或 FinaSU 的 root 环境。
 | OPPO K13 Turbo Pro（PLE110） | ColorOS 17 | `6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k` |
 | Realme Neo8（RMX8899） | ColorOS 16/17 | `6.12.38-android16-5-g844001fb8721-ab14552068-4k`<br>`6.12.69-android16-6-g242e1a07f878-ab15865446-4k`<br>`6.12.69-android16-6-g5fd39602326e-ab16372235-4k` |
 | vivo / iQOO 机型 | OriginOS 6/7 | `6.12.58-android16-6-g690108013dcc-abogki576129896-4k`<br>`6.12.58-android16-6-g0a092cc0037a-abogki521987229-4k`<br>`6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k`<br>`6.12.23-android16-5-g41f4cb1fa7c7-abogki465038634-4k`<br>`6.6.127-android15-8-gd489d4ad2a70-abogki567717946-4k` |
+| Motorola Signature | Android 17 | `6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k` |
 
 ## 支持的管理器
 

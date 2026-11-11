@@ -2877,8 +2877,11 @@ class MainActivity : ComponentActivity() {
         kernelVersion == "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k" ||
             kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k"
 
+    private fun isMotorolaDevice(): Boolean =
+        Build.MANUFACTURER.equals("motorola", ignoreCase = true)
+
     private fun hidesOplusOnlyOptions(): Boolean =
-        isVivoV2505a() || isXiaomiPortKernel()
+        isVivoV2505a() || isXiaomiPortKernel() || isMotorolaDevice()
 
     /** OriginOS 7 builds load the KSU LKM through the hooks_defend gate. */
     private fun isGateKernel(): Boolean =
