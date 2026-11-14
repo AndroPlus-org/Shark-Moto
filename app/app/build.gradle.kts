@@ -33,8 +33,8 @@ android {
         applicationId = "com.shark.kty"
         minSdk = 33
         targetSdk = 37
-        versionCode = 99
-        versionName = "2.4"
+        versionCode = 100
+        versionName = "2.4.1"
         ndk {
             abiFilters.add("arm64-v8a")
         }
