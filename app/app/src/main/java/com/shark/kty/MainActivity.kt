@@ -1,10 +1,14 @@
 package com.shark.kty
 
+import android.Manifest
+import android.app.AlertDialog
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
@@ -75,6 +79,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RemoveModerator
 import androidx.compose.material.icons.filled.RestartAlt
@@ -267,6 +272,7 @@ class MainActivity : ComponentActivity() {
     private var susfsSupport by mutableStateOf(false)
     private var vfsSupport by mutableStateOf(false)
     private var chaseRetry by mutableStateOf(true)
+    private var autoJailbreak by mutableStateOf(false)
     private var dynamicSwitching by mutableStateOf(false)
     private var universalLoaded by mutableStateOf(false)
     private var hotManager by mutableStateOf(ManagerKind.KERNELSU)
@@ -447,9 +453,13 @@ class MainActivity : ComponentActivity() {
         val savedManager = getSharedPreferences("pyb110", MODE_PRIVATE).getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
         kernelVersion = runCatching { android.system.Os.uname().release }.getOrDefault("未知")
-        exploit = PROFILE_BY_RELEASE[kernelVersion] ?: ExploitKind.UNSUPPORTED
+        exploit = JailbreakCore.kindFor(kernelVersion)?.let {
+            runCatching { ExploitKind.valueOf(it) }.getOrNull()
+        } ?: ExploitKind.UNSUPPORTED
         chaseRetry = getSharedPreferences("pyb110", MODE_PRIVATE)
             .getBoolean("chase_retry", defaultChaseRetry())
+        autoJailbreak = getSharedPreferences("pyb110", MODE_PRIVATE)
+            .getBoolean("auto_jailbreak", false)
         if (manager == ManagerKind.DYNAMIC && !supportsUniversal()) {
             manager = ManagerKind.KERNELSU
         }
@@ -1493,6 +1503,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                        SettingSwitchItem(
+                            icon = Icons.Filled.PowerSettingsNew,
+                            title = "开机自动越狱",
+                            checked = autoJailbreak,
+                            onCheckedChange = { updateAutoJailbreak(it) }
+                        )
+                        Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     }
                     if (supportsSusfs()) {
                         SettingSwitchItem(
@@ -2312,6 +2329,59 @@ class MainActivity : ComponentActivity() {
         addLog("Chase retry: ${if (value) "on (retry a missed victim page)" else "off"}")
     }
 
+    private fun updateAutoJailbreak(value: Boolean) {
+        autoJailbreak = value
+        getSharedPreferences("pyb110", MODE_PRIVATE).edit().putBoolean("auto_jailbreak", value).apply()
+        addLog("Boot auto-jailbreak: ${if (value) "on" else "off"}")
+        if (!value) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATIONS)
+        }
+        val power = getSystemService(PowerManager::class.java)
+        if (!power.isIgnoringBatteryOptimizations(packageName)) {
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+            }.onFailure { addLog("Battery optimization request failed: $it") }
+        }
+        if (Build.MANUFACTURER.equals("xiaomi", ignoreCase = true)) {
+            AlertDialog.Builder(this)
+                .setTitle("自启动权限")
+                .setMessage("请在 MIUI/HyperOS 的自启动管理中允许 Shark 自启动，否则重启后无法自动越狱。")
+                .setPositiveButton("去设置") { _, _ ->
+                    if (!openAutoStartSettings()) {
+                        Toast.makeText(
+                            this, "未找到自启动设置，请手动在系统设置中允许", Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                .setNegativeButton("稍后", null)
+                .show()
+        }
+    }
+
+    private fun openAutoStartSettings(): Boolean {
+        val candidates = listOf(
+            Intent().setComponent(
+                ComponentName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                )
+            ),
+            Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT)
+        )
+        for (intent in candidates) {
+            if (runCatching { startActivity(intent); true }.getOrDefault(false)) return true
+        }
+        return false
+    }
+
     private fun selectManager(kind: ManagerKind) {
         manager = kind
         dynamicSwitching = kind == ManagerKind.DYNAMIC
@@ -2398,31 +2468,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun resolveDeviceName(): String {
-        val marketName = when (Build.MANUFACTURER.orEmpty().lowercase()) {
-            "xiaomi" -> getSystemProperty("ro.product.marketname")
-            "oppo", "oneplus", "realme", "oplus" -> getSystemProperty("ro.vendor.oplus.market.name")
-            "vivo" -> getSystemProperty("ro.vivo.market.name")
-            "honor", "huawei" -> getSystemProperty("ro.config.marketing_name")
-            "zte", "nubia" -> getSystemProperty("ro.vendor.product.ztename")
-            else -> ""
-        }.trim().takeIf {
-            it.isNotEmpty() && !it.equals(Build.UNKNOWN, ignoreCase = true) && !it.equals("null", ignoreCase = true)
-        }
-        if (marketName != null) return marketName
-        return buildString {
-            append(Build.MANUFACTURER)
-            if (!Build.BRAND.equals(Build.MANUFACTURER, ignoreCase = true)) append(" ").append(Build.BRAND)
-            append(" ").append(Build.MODEL)
-        }
-    }
-
-    private fun getSystemProperty(key: String): String = try {
-        val props = Class.forName("android.os.SystemProperties")
-        props.getMethod("get", String::class.java).invoke(null, key) as? String ?: ""
-    } catch (t: Throwable) {
-        ""
-    }
+    private fun resolveDeviceName(): String = JailbreakCore.resolveDeviceName()
 
     private fun refreshStaticStateAsync() {
         lifecycleScope.launch(Dispatchers.IO) {
@@ -2474,6 +2520,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun runFlow() {
+        if (!RunLock.tryAcquire()) {
+            Toast.makeText(this, "已有越狱任务在运行", Toast.LENGTH_SHORT).show()
+            return
+        }
         busy = true
         val softReboot = softRebootAfter
         val startedAt = System.currentTimeMillis()
@@ -2568,56 +2618,26 @@ class MainActivity : ComponentActivity() {
                 addLog("ERROR: $t")
             } finally {
                 HistoryStore.finish(success, exit, System.currentTimeMillis() - startedAt)
+                RunLock.release()
                 withContext(Dispatchers.Main) { busy = false }
             }
         }
     }
 
     private fun runStreaming(cmd: Array<String>, dir: String): Int {
-        val susfsKo = if (exploit == ExploitKind.CVE61821) {
-            "${applicationInfo.nativeLibraryDir}/libsusfs_guard_lkm.so"
-        } else {
-            "${applicationInfo.nativeLibraryDir}/libsusfs_guard_lkm_612.so"
-        }
-        val susfsActive = susfsSupport && supportsSusfs()
-        val universal = dynamicSwitching && supportsUniversal()
-        val initialManager = if (manager == ManagerKind.DYNAMIC) ManagerKind.KERNELSU else manager
-        val env = shizukuEnv() + "PYB110_DIR=$dir" + "PYB110_MANAGER=${initialManager.manager}" +
-            "PYB110_LATE_LOAD=1" +
-            "PYB110_UNLOAD_GUARD=${if (unloadGuard) "1" else "0"}" +
-            "PYB110_GATE=${if (isGateKernel()) "1" else "0"}" +
-            "PYB110_DISABLE_ANTIROOT=${if (antiRootGuard) "1" else "0"}" +
-            "PYB110_SUSFS=${if (susfsActive) "1" else "0"}" +
-            "PYB110_VFS=${if (vfsSupport) "1" else "0"}" +
-            "PYB110_CHASE=${if (chaseRetry) "1" else "0"}" +
-            "PYB110_UNIVERSAL=${if (universal) "1" else "0"}" +
-            "PYB110_UNIVERSAL_KSUD=${applicationInfo.nativeLibraryDir}/libksud_universal.so" +
-            "PYB110_FILES_DIR=${filesDir.absolutePath}" +
-            "PYB110_SUSFS_KO=$susfsKo" +
-            "PYB110_VFS_KO=${applicationInfo.nativeLibraryDir}/libhybridmount.so"
-        val p = PrivService.newProcess(cmd, env, dir)
-        val out = p.getInputStream()
-        val err = p.getErrorStream()
-        val t1 = Thread {
-            try {
-                out.bufferedReader().forEachLine { addLog(it) }
-            } catch (t: Throwable) {
-                // stream closed by waitFor() cleanup
-            }
-        }.apply { isDaemon = true; start() }
-        val t2 = Thread {
-            try {
-                err.bufferedReader().forEachLine { addLog(it) }
-            } catch (t: Throwable) {
-                // stream closed by waitFor() cleanup
-            }
-        }.apply { isDaemon = true; start() }
-        val rc = p.waitFor()
-        runCatching { out.close() }
-        runCatching { err.close() }
-        t1.join(2000)
-        t2.join(2000)
-        return rc
+        val cfg = JailbreakCore.EnvConfig(
+            kind = exploit.name,
+            release = kernelVersion,
+            managerKind = manager.name,
+            antiRootGuard = antiRootGuard,
+            unloadGuard = unloadGuard,
+            susfsSupport = susfsSupport,
+            vfsSupport = vfsSupport,
+            universal = dynamicSwitching && supportsUniversal(),
+            chaseRetry = chaseRetry
+        )
+        val env = JailbreakCore.buildEnv(applicationContext, cfg, dir)
+        return JailbreakCore.runStreaming(cmd, env, dir) { addLog(it) }
     }
 
     override fun onDestroy() {
@@ -2669,44 +2689,20 @@ class MainActivity : ComponentActivity() {
 
     /** OriginOS 7 builds load the KSU LKM through the hooks_defend gate. */
     private fun isGateKernel(): Boolean =
-        exploit == ExploitKind.CVE66127 ||
-            kernelVersion == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k" ||
-            (exploit == ExploitKind.CVE61258 &&
-                (kernelVersion.contains("gdd6fd5c98918") ||
-                    kernelVersion.contains("g690108013dcc")))
+        JailbreakCore.isGateKernel(exploit.name, kernelVersion)
 
-    private fun supportsUniversal(): Boolean =
-        exploit == ExploitKind.CVE61821 ||
-            exploit == ExploitKind.CVE61269 ||
-            exploit == ExploitKind.CVE61238 ||
-            exploit == ExploitKind.CVE61258 ||
-            exploit == ExploitKind.CVE61223
+    private fun supportsUniversal(): Boolean = JailbreakCore.supportsUniversal(exploit.name)
 
     private fun supportsSusfs(): Boolean =
-        !isGateKernel() && exploit != ExploitKind.CVE66118 &&
-            exploit != ExploitKind.CVE66127 &&
-            exploit != ExploitKind.UNSUPPORTED
+        JailbreakCore.supportsSusfs(exploit.name, isGateKernel())
 
-    private fun isPlantCore61821(): Boolean =
-        kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k" ||
-            kernelVersion == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
+    private fun isPlantCore61821(): Boolean = JailbreakCore.isPlantCore61821(kernelVersion)
 
     /** The 6.18.21 standalone chain has its own retry, not the page chase. */
     private fun supportsChaseRetry(): Boolean =
-        exploit != ExploitKind.UNSUPPORTED &&
-            !(exploit == ExploitKind.CVE61821 && !isPlantCore61821())
+        JailbreakCore.supportsChaseRetry(exploit.name, kernelVersion)
 
-    private fun isVivoOemDevice(): Boolean =
-        Build.MANUFACTURER.equals("vivo", ignoreCase = true) ||
-            Build.MANUFACTURER.equals("iQOO", ignoreCase = true) ||
-            Build.BRAND.equals("vivo", ignoreCase = true) ||
-            Build.BRAND.equals("iQOO", ignoreCase = true)
-
-    /** Chase pays off on vivo/iQOO; on Xiaomi and ColorOS ports it is opt-in. */
-    private fun defaultChaseRetry(): Boolean =
-        isVivoOemDevice() ||
-            exploit == ExploitKind.CVE61223 ||
-            exploit == ExploitKind.CVE66127
+    private fun defaultChaseRetry(): Boolean = JailbreakCore.defaultChaseRetry(exploit.name)
 
     private fun managerChoices(): List<ManagerKind> =
         if (supportsUniversal()) ManagerKind.entries
@@ -2717,24 +2713,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val REQ_SHIZUKU = 1001
-        private val PROFILE_BY_RELEASE: Map<String, ExploitKind> = mapOf(
-            "6.18.21-android17-5-gf957accaf563-ab15926176-4k" to ExploitKind.CVE61821,
-            "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k" to ExploitKind.CVE61821,
-            "6.18.21-android17-5-g284297031c53-abogki555938958-4k" to ExploitKind.CVE61821,
-            "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k" to ExploitKind.CVE61821,
-            "6.12.69-android16-6-g242e1a07f878-ab15865446-4k" to ExploitKind.CVE61269,
-            "6.12.69-android16-6-g5fd39602326e-ab16372235-4k" to ExploitKind.CVE61269,
-            "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k" to ExploitKind.CVE61269,
-            "6.12.38-android16-5-g844001fb8721-ab14552068-4k" to ExploitKind.CVE61238,
-            "6.12.58-android16-6-g7704a1ae279b-ab15213644-4k" to ExploitKind.CVE61258,
-            "6.12.58-android16-6-g0a092cc0037a-abogki521987229-4k" to ExploitKind.CVE61258,
-            "6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k" to ExploitKind.CVE61258,
-            "6.12.23-android16-5-g41f4cb1fa7c7-abogki465038634-4k" to ExploitKind.CVE61223,
-            "6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k" to ExploitKind.CVE66118,
-            "6.6.118-android15-8-gc4127a25dcf3-ab15863337-4k" to ExploitKind.CVE66118,
-            "6.6.118-android15-8-gb1422e39c313-abogki552867473-4k" to ExploitKind.CVE66118,
-            "6.6.127-android15-8-gd489d4ad2a70-abogki567717946-4k" to ExploitKind.CVE66127,
-            "6.12.58-android16-6-g690108013dcc-abogki576129896-4k" to ExploitKind.CVE61258,
-        )
+        private const val REQ_NOTIFICATIONS = 1002
     }
 }
