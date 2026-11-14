@@ -56,6 +56,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -96,9 +97,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -114,6 +117,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -139,6 +143,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Notes
@@ -281,6 +286,7 @@ class MainActivity : ComponentActivity() {
     private var tab by mutableStateOf(AppTab.HOME)
     private var showManual by mutableStateOf(false)
     private var showExtras by mutableStateOf(false)
+    private var legalAccepted by mutableStateOf(false)
     private var historyEntries by mutableStateOf(listOf<HistoryEntry>())
     private var historyDetail by mutableStateOf<HistoryEntry?>(null)
     private var historyDetailText by mutableStateOf("")
@@ -450,6 +456,8 @@ class MainActivity : ComponentActivity() {
         unloadGuard = getSharedPreferences("pyb110", MODE_PRIVATE).getBoolean("unload_guard", true)
         susfsSupport = getSharedPreferences("pyb110", MODE_PRIVATE).getBoolean("susfs_support", false)
         vfsSupport = getSharedPreferences("pyb110", MODE_PRIVATE).getBoolean("vfs_support", false)
+        legalAccepted = getSharedPreferences("pyb110", MODE_PRIVATE)
+            .getBoolean("legal_accepted", false)
         val savedManager = getSharedPreferences("pyb110", MODE_PRIVATE).getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
         kernelVersion = runCatching { android.system.Os.uname().release }.getOrDefault("未知")
@@ -477,8 +485,182 @@ class MainActivity : ComponentActivity() {
 
     /* ===== Root chrome ===== */
 
+    private val legalPhrase =
+        "我已确认能接受使用该工具可能造成的相关后果并承诺遵守开源协议"
+
+    @Composable
+    private fun LegalSection(title: String, lines: List<String>) {
+        Text(text = title, kind = CouiTextKind.SectionTitle, color = CouiTheme.colorScheme.accent)
+        Spacer(Modifier.height(8.dp))
+        for (line in lines) {
+            Text(text = line, kind = CouiTextKind.Description, color = CouiTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(8.dp))
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+
+    @Composable
+    private fun LegalGate(onAccept: () -> Unit) {
+        val scheme = CouiTheme.colorScheme
+        val scroll = rememberScrollState()
+        var input by remember { mutableStateOf("") }
+        var laidOut by remember { mutableStateOf(false) }
+        var readDone by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            laidOut = true
+        }
+        val atBottom by remember {
+            derivedStateOf { scroll.maxValue == 0 || scroll.value >= scroll.maxValue - 8 }
+        }
+        LaunchedEffect(laidOut, atBottom) {
+            if (laidOut && atBottom) readDone = true
+        }
+        val matched = input.trim() == legalPhrase
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(scheme.background)
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .imePadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = "免责声明与开源协议",
+                kind = CouiTextKind.SectionTitle,
+                color = scheme.accent
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "使用本工具前，请完整阅读以下内容；确认一次后不再弹出。不认同其中任何一条，请立即退出并卸载。",
+                kind = CouiTextKind.Description,
+                color = scheme.onSurface.copy(alpha = 0.7f)
+            )
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(scheme.surface, RoundedCornerShape(14.dp))
+                    .verticalScroll(scroll)
+                    .padding(16.dp)
+            ) {
+                LegalSection(
+                    "免责声明",
+                    listOf(
+                        "1. 本工具仅限用于您本人拥有或已获得明确授权的设备，用于系统研究、学习与日常维护。严禁用于任何未经授权的设备、他人财产或非法用途；由此产生的一切后果由使用者自行承担。",
+                        "2. 本工具通过利用系统内核漏洞实现临时越狱与提权，属于对操作系统运行时行为的深度修改，其行为方式与常规应用程序有本质区别，可能被杀毒软件、企业 MDM 或应用商店安全扫描标记为风险程序。",
+                        "3. 使用过程中可能出现设备重启、卡死、无法开机、数据丢失、系统分区损坏等情况；严重时可能需要刷机恢复出厂设置甚至送修。请在操作前完整备份重要数据（照片、聊天记录、密钥、银行与支付凭证等），并确认自己具备恢复设备的能力。",
+                        "4. 越狱会削弱或绕过系统的部分安全机制（包括 SELinux、签名校验与启动链完整性检查），设备在越狱期间及其后一段时间内更容易受到恶意软件攻击，银行、支付、政务、企业办公等敏感应用可能拒绝运行或检测到环境异常。",
+                        "5. 越狱后设备的保修与售后政策可能受影响；系统 OTA 更新可能失败、被阻断，或因版本校验不匹配导致设备无法启动。是否保留 Root、何时撤销、何时更新系统，由您自行判断并承担风险。",
+                        "6. 本工具按「现状」提供，不附带任何明示或默示的担保，包括但不限于适销性、特定用途适用性、稳定运行与不侵权的担保。作者不承诺本工具适用于任何特定设备、系统版本或使用场景。",
+                        "7. 在适用法律允许的最大范围内，作者与贡献者不对因使用或无法使用本工具造成的任何直接、间接、偶然、特殊或后果性损失承担责任，包括但不限于数据损失、利润损失、业务中断、设备损坏、保修失效与第三方索赔。",
+                        "8. 您应确保使用行为符合所在地法律法规以及设备所属组织（如雇主、学校）的管理规定；不得利用本工具绕过他人设备的安全机制、规避计费、破解受保护内容、干扰公共网络或从事任何侵权活动。",
+                        "9. 本工具不提供账户、订阅或云端服务，不收集、不上传您的个人数据，全部操作均在您的设备本地完成。非官方渠道分发的构建版本可能与源码存在差异或含额外改动，请仅从官方仓库获取并自行核对。",
+                        "10. 是否使用本工具、在哪些设备上使用、使用到何种程度，完全由您自行决定。若您对上述任何风险存在疑虑，或无法承担相应后果，请立即退出并卸载本工具。",
+                        "11. 本工具包含的第三方组件、预编译库与素材分别遵循其自身许可证，相关声明见应用内「关于 — 许可」页面与随仓库分发的 NOTICE 文件；这些组件不因本声明的签署而改变其许可条件。",
+                        "12. 作者保留在不另行通知的情况下修改、暂停或终止本项目及其任何功能的权利；条文更新后若您继续使用，即视为接受更新后的全部内容。"
+                    )
+                )
+                LegalSection(
+                    "开源许可（GNU GPLv3）",
+                    listOf(
+                        "1. 本项目（含应用程序与内核载荷源码）以 GNU 通用公共许可证第 3 版（GPLv3）发布，许可证全文见项目根目录的 LICENSE 文件，二者内容不一致时以 LICENSE 全文为准。",
+                        "2. 您享有运行、研究、修改与再分发本程序的自由，但行使上述自由的前提是完整遵守 GPLv3 的全部条款。",
+                        "3. 再分发本程序或其修改版本时，必须保留原有的版权声明与许可证文本；在修改过的文件中显著标明修改内容及修改日期；并向接收者提供完整的对应源代码（§5）。",
+                        "4. 以目标代码（二进制）形式分发时，必须同时以不高于实际分发成本的合理方式提供对应源代码，或提供有效期不少于三年的书面获取承诺（§6）。",
+                        "5. 通过用户产品（如预装设备、定制固件）分发时，还须提供必要的「安装信息」，使接收者能够在其设备上安装修改后的版本（§6，防止通过硬件限制架空许可证）。",
+                        "6. 您不得对 GPLv3 授予的权利附加任何额外限制；分发时不得附加与本许可证冲突的条款，亦不得对接收者行使许可证权利收取许可费（§7、§10）。",
+                        "7. 本程序的贡献者授予您非排他性的专利许可；若您对任何贡献者发起专利诉讼，您依据本许可证获得的专利许可将相应终止（§11）。",
+                        "8. 许可证授权在您违反条款时自动终止；若您在收到通知后 30 天内纠正违规行为，授权可自纠正之日起恢复（§8）。",
+                        "9. 本程序不提供任何担保；在适用法律允许的范围内，作者与贡献者不对任何损害承担赔偿责任（§15、§16）。",
+                        "10. GPLv3 仅授予著作权与专利层面的许可，不授予本项目名称、图标、商标或品牌的使用权；未经许可不得以本项目名义发布衍生版本或暗示官方背书。",
+                        "11. 违反本许可证的，授权将按 §8 终止；在授权终止后继续复制、分发或修改本程序的，可能构成著作权侵权并承担相应法律责任。"
+                    )
+                )
+                Text(
+                    text = "— 以上为全部条文 —",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    kind = CouiTextKind.Description,
+                    color = scheme.onSurface.copy(alpha = 0.45f)
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "请滑动上方条文到最底部，并原样输入以下文字：",
+                kind = CouiTextKind.Description,
+                color = scheme.onSurface.copy(alpha = 0.75f)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(text = legalPhrase, kind = CouiTextKind.Description, color = scheme.accent)
+            Spacer(Modifier.height(8.dp))
+            BasicTextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(scheme.card, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                textStyle = TextStyle(color = scheme.onSurface, fontSize = 14.sp),
+                decorationBox = { inner ->
+                    if (input.isEmpty()) {
+                        Text(
+                            text = "在此输入确认文字",
+                            kind = CouiTextKind.Description,
+                            color = scheme.onSurface.copy(alpha = 0.4f)
+                        )
+                    }
+                    inner()
+                }
+            )
+            Spacer(Modifier.height(10.dp))
+            val enabled = readDone && matched
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (enabled) scheme.accent else scheme.onSurface.copy(alpha = 0.12f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable(enabled = enabled) { onAccept() }
+                    .padding(vertical = 13.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "确认并进入",
+                    kind = CouiTextKind.SectionTitle,
+                    color = if (enabled) Color.White else scheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            if (!readDone) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "请先滑动到条文最底部",
+                    kind = CouiTextKind.Description,
+                    color = scheme.onSurface.copy(alpha = 0.6f)
+                )
+            } else if (input.isNotEmpty() && !matched) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "输入内容与要求不一致，请原样输入",
+                    kind = CouiTextKind.Description,
+                    color = Color(0xFFD32F2F)
+                )
+            }
+        }
+    }
+
     @Composable
     private fun AppRoot() {
+        if (!legalAccepted) {
+            LegalGate(onAccept = {
+                legalAccepted = true
+                getSharedPreferences("pyb110", MODE_PRIVATE).edit()
+                    .putBoolean("legal_accepted", true).apply()
+            })
+            return
+        }
         val dark = CouiTheme.isDark
         val overlayVisible = showManual || showExtras
         BackHandler(
@@ -2561,10 +2743,10 @@ class MainActivity : ComponentActivity() {
                 val cmd = when (exploit) {
                     ExploitKind.CVE61821 -> arrayOf(
                         if (isPlantCore61821())
-                            if (BuildConfig.VIVO_IQOO_SUPPORT)
-                                "$nativeDir/libk61821p.so"
-                            else
-                                "$nativeDir/libk61821x.so"
+                            if (BuildConfig.VIVO_IQOO_SUPPORT &&
+                                BuildConfig.VIVO_61821_SUPPORT
+                            ) "$nativeDir/libk61821p.so"
+                            else "$nativeDir/libk61821x.so"
                         else
                             "$nativeDir/libk61821.so",
                         "run"
