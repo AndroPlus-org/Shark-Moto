@@ -266,6 +266,7 @@ class MainActivity : ComponentActivity() {
     private var unloadGuard by mutableStateOf(true)
     private var susfsSupport by mutableStateOf(false)
     private var vfsSupport by mutableStateOf(false)
+    private var chaseRetry by mutableStateOf(true)
     private var dynamicSwitching by mutableStateOf(false)
     private var universalLoaded by mutableStateOf(false)
     private var hotManager by mutableStateOf(ManagerKind.KERNELSU)
@@ -447,6 +448,8 @@ class MainActivity : ComponentActivity() {
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
         kernelVersion = runCatching { android.system.Os.uname().release }.getOrDefault("未知")
         exploit = PROFILE_BY_RELEASE[kernelVersion] ?: ExploitKind.UNSUPPORTED
+        chaseRetry = getSharedPreferences("pyb110", MODE_PRIVATE)
+            .getBoolean("chase_retry", defaultChaseRetry())
         if (manager == ManagerKind.DYNAMIC && !supportsUniversal()) {
             manager = ManagerKind.KERNELSU
         }
@@ -1480,6 +1483,15 @@ class MainActivity : ComponentActivity() {
                                 onCheckedChange = { updateUnloadGuard(it) }
                             )
                         }
+                        if (supportsChaseRetry()) {
+                            Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                            SettingSwitchItem(
+                                icon = Icons.Filled.Refresh,
+                                title = "打偏后追页重试",
+                                checked = chaseRetry,
+                                onCheckedChange = { updateChaseRetry(it) }
+                            )
+                        }
                         Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     }
                     if (supportsSusfs()) {
@@ -2294,6 +2306,12 @@ class MainActivity : ComponentActivity() {
         addLog("VFS support: ${if (value) "on (load hybridmount ko after jailbreak)" else "off"}")
     }
 
+    private fun updateChaseRetry(value: Boolean) {
+        chaseRetry = value
+        getSharedPreferences("pyb110", MODE_PRIVATE).edit().putBoolean("chase_retry", value).apply()
+        addLog("Chase retry: ${if (value) "on (retry a missed victim page)" else "off"}")
+    }
+
     private fun selectManager(kind: ManagerKind) {
         manager = kind
         dynamicSwitching = kind == ManagerKind.DYNAMIC
@@ -2571,6 +2589,7 @@ class MainActivity : ComponentActivity() {
             "PYB110_DISABLE_ANTIROOT=${if (antiRootGuard) "1" else "0"}" +
             "PYB110_SUSFS=${if (susfsActive) "1" else "0"}" +
             "PYB110_VFS=${if (vfsSupport) "1" else "0"}" +
+            "PYB110_CHASE=${if (chaseRetry) "1" else "0"}" +
             "PYB110_UNIVERSAL=${if (universal) "1" else "0"}" +
             "PYB110_UNIVERSAL_KSUD=${applicationInfo.nativeLibraryDir}/libksud_universal.so" +
             "PYB110_FILES_DIR=${filesDir.absolutePath}" +
@@ -2671,6 +2690,23 @@ class MainActivity : ComponentActivity() {
     private fun isPlantCore61821(): Boolean =
         kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k" ||
             kernelVersion == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
+
+    /** The 6.18.21 standalone chain has its own retry, not the page chase. */
+    private fun supportsChaseRetry(): Boolean =
+        exploit != ExploitKind.UNSUPPORTED &&
+            !(exploit == ExploitKind.CVE61821 && !isPlantCore61821())
+
+    private fun isVivoOemDevice(): Boolean =
+        Build.MANUFACTURER.equals("vivo", ignoreCase = true) ||
+            Build.MANUFACTURER.equals("iQOO", ignoreCase = true) ||
+            Build.BRAND.equals("vivo", ignoreCase = true) ||
+            Build.BRAND.equals("iQOO", ignoreCase = true)
+
+    /** Chase pays off on vivo/iQOO; on Xiaomi and ColorOS ports it is opt-in. */
+    private fun defaultChaseRetry(): Boolean =
+        isVivoOemDevice() ||
+            exploit == ExploitKind.CVE61223 ||
+            exploit == ExploitKind.CVE66127
 
     private fun managerChoices(): List<ManagerKind> =
         if (supportsUniversal()) ManagerKind.entries
