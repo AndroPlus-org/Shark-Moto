@@ -2492,7 +2492,7 @@ class MainActivity : ComponentActivity() {
                 addLog("Starting ${exploit.fullLabel}")
                 val cmd = when (exploit) {
                     ExploitKind.CVE61821 -> arrayOf(
-                        if (kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k")
+                        if (isPlantCore61821())
                             "$nativeDir/libk61821p.so" else "$nativeDir/libk61821.so",
                         "run"
                     )
@@ -2651,6 +2651,7 @@ class MainActivity : ComponentActivity() {
     /** OriginOS 7 builds load the KSU LKM through the hooks_defend gate. */
     private fun isGateKernel(): Boolean =
         exploit == ExploitKind.CVE66127 ||
+            kernelVersion == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k" ||
             (exploit == ExploitKind.CVE61258 &&
                 (kernelVersion.contains("gdd6fd5c98918") ||
                     kernelVersion.contains("g690108013dcc")))
@@ -2667,6 +2668,10 @@ class MainActivity : ComponentActivity() {
             exploit != ExploitKind.CVE66127 &&
             exploit != ExploitKind.UNSUPPORTED
 
+    private fun isPlantCore61821(): Boolean =
+        kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k" ||
+            kernelVersion == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
+
     private fun managerChoices(): List<ManagerKind> =
         if (supportsUniversal()) ManagerKind.entries
         else ManagerKind.entries.filter { it != ManagerKind.DYNAMIC }
@@ -2680,6 +2685,7 @@ class MainActivity : ComponentActivity() {
             "6.18.21-android17-5-gf957accaf563-ab15926176-4k" to ExploitKind.CVE61821,
             "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k" to ExploitKind.CVE61821,
             "6.18.21-android17-5-g284297031c53-abogki555938958-4k" to ExploitKind.CVE61821,
+            "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k" to ExploitKind.CVE61821,
             "6.12.69-android16-6-g242e1a07f878-ab15865446-4k" to ExploitKind.CVE61269,
             "6.12.69-android16-6-g5fd39602326e-ab16372235-4k" to ExploitKind.CVE61269,
             "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k" to ExploitKind.CVE61269,
