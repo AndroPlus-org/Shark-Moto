@@ -2247,7 +2247,7 @@ class MainActivity : ComponentActivity() {
                         icon = Icons.Filled.Forum,
                         title = "加入社区",
                         summary = "加入 QQ 群",
-                        onClick = { uriHandler.openUri("https://qm.qq.com/q/HMg4ngAC8W") },
+                        onClick = { uriHandler.openUri("https://qun.qq.com/universal-share/share?ac=1&authKey=eE6%2FYVLY%2BFHI2Jp1Zl41xbKG8RF68rLFFsYyiVEX8jXZ8q1vUt%2Fx8qRNuVwXUX%2BN&busi_data=eyJncm91cENvZGUiOiIzMzIxNTgyNzMiLCJ0b2tlbiI6InF0dElWSE1oaFdIRVQzc3dEM2dkVEplR1FMKzdsQWI5Zm83cnBKVVdpdEtpZ2IyVDRHVzdFU3RtL2JpczdtdUUiLCJ1aW4iOiIzMzQ0ODI1NTI5In0%3D&data=Sk6L8EVerfFbnZ9vvaFh8A7VLTyPXMxQLGi5k745ItjvgiYSuIltQO8nDA6llZ0Y6MKw25z0LT3uMNGui0QJjQ&svctype=4&tempid=h5_group_info") },
                         trailing = { Chevron() }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
