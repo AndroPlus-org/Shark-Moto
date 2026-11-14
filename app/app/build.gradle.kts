@@ -11,6 +11,9 @@ val keystoreProps = Properties().apply {
  * the vivo-only native payloads.  Build the full package with
  * -PsharkVivo=true. */
 val vivoIqoo = (findProperty("sharkVivo") ?: "false").toString().toBoolean()
+/* vivo's 6.18.21 (PD2606) chain can also be dropped on its own; build the
+ * "full minus PD2606" package with -PsharkVivo=true -PsharkVivo61821=false. */
+val vivo61821 = (findProperty("sharkVivo61821") ?: "true").toString().toBoolean()
 
 plugins {
     id("com.android.application")
@@ -36,6 +39,7 @@ android {
             abiFilters.add("arm64-v8a")
         }
         buildConfigField("boolean", "VIVO_IQOO_SUPPORT", vivoIqoo.toString())
+        buildConfigField("boolean", "VIVO_61821_SUPPORT", vivo61821.toString())
     }
     buildFeatures {
         compose = true
@@ -74,10 +78,11 @@ android {
                     "lib/arm64-v8a/libk61821p.so"
                 )
             } else {
-                excludes += setOf(
-                    "lib/arm64-v8a/libk61258x.so",
-                    "lib/arm64-v8a/libk61821x.so"
-                )
+                excludes += "lib/arm64-v8a/libk61258x.so"
+                if (vivo61821)
+                    excludes += "lib/arm64-v8a/libk61821x.so"
+                else
+                    excludes += "lib/arm64-v8a/libk61821p.so"
             }
             keepDebugSymbols.add("**/libk61821.so")
             keepDebugSymbols.add("**/libksud_universal.so")

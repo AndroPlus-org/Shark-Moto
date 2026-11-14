@@ -50,8 +50,13 @@ object JailbreakCore {
         "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
     )
 
+    private const val PD2606_RELEASE =
+        "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
+
     fun kindFor(release: String): String? {
         if (!BuildConfig.VIVO_IQOO_SUPPORT && release in VIVO_IQOO_RELEASES)
+            return null
+        if (!BuildConfig.VIVO_61821_SUPPORT && release == PD2606_RELEASE)
             return null
         return PROFILE_BY_RELEASE[release]
     }
@@ -63,7 +68,8 @@ object JailbreakCore {
 
     fun runnerLib(nativeDir: String, kind: String, release: String): String? = when (kind) {
         "CVE61821" -> if (isPlantCore61821(release)) {
-            if (BuildConfig.VIVO_IQOO_SUPPORT) "$nativeDir/libk61821p.so"
+            if (BuildConfig.VIVO_IQOO_SUPPORT && BuildConfig.VIVO_61821_SUPPORT)
+                "$nativeDir/libk61821p.so"
             else "$nativeDir/libk61821x.so"
         } else "$nativeDir/libk61821.so"
         "CVE61269" -> "$nativeDir/libk61269.so"
