@@ -24,6 +24,7 @@ object JailbreakCore {
         "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k" to "CVE61821",
         "6.18.21-android17-5-g284297031c53-abogki555938958-4k" to "CVE61821",
         "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k" to "CVE61821",
+        "6.18.21-android17-5-g1d099fcb35e0-abogki540753930-4k" to "CVE61821",
         "6.12.69-android16-6-g242e1a07f878-ab15865446-4k" to "CVE61269",
         "6.12.69-android16-6-g5fd39602326e-ab16372235-4k" to "CVE61269",
         "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k" to "CVE61269",
@@ -39,17 +40,36 @@ object JailbreakCore {
         "6.12.58-android16-6-g690108013dcc-abogki576129896-4k" to "CVE61258"
     )
 
-    fun kindFor(release: String): String? = PROFILE_BY_RELEASE[release]
+    /* Devices whose support is only shipped in the full (vivo) build. */
+    private val VIVO_IQOO_RELEASES = setOf(
+        "6.12.23-android16-5-g41f4cb1fa7c7-abogki465038634-4k",
+        "6.6.127-android15-8-gd489d4ad2a70-abogki567717946-4k",
+        "6.12.58-android16-6-g0a092cc0037a-abogki521987229-4k",
+        "6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k",
+        "6.12.58-android16-6-g690108013dcc-abogki576129896-4k",
+        "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
+    )
+
+    fun kindFor(release: String): String? {
+        if (!BuildConfig.VIVO_IQOO_SUPPORT && release in VIVO_IQOO_RELEASES)
+            return null
+        return PROFILE_BY_RELEASE[release]
+    }
 
     fun isPlantCore61821(release: String): Boolean =
         release == "6.18.21-android17-5-g284297031c53-abogki555938958-4k" ||
-            release == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k"
+            release == "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k" ||
+            release == "6.18.21-android17-5-g1d099fcb35e0-abogki540753930-4k"
 
     fun runnerLib(nativeDir: String, kind: String, release: String): String? = when (kind) {
-        "CVE61821" -> if (isPlantCore61821(release)) "$nativeDir/libk61821p.so" else "$nativeDir/libk61821.so"
+        "CVE61821" -> if (isPlantCore61821(release)) {
+            if (BuildConfig.VIVO_IQOO_SUPPORT) "$nativeDir/libk61821p.so"
+            else "$nativeDir/libk61821x.so"
+        } else "$nativeDir/libk61821.so"
         "CVE61269" -> "$nativeDir/libk61269.so"
         "CVE61238" -> "$nativeDir/libk61238.so"
-        "CVE61258" -> "$nativeDir/libk61258.so"
+        "CVE61258" -> if (BuildConfig.VIVO_IQOO_SUPPORT) "$nativeDir/libk61258.so"
+        else "$nativeDir/libk61258x.so"
         "CVE61223" -> "$nativeDir/libk61223.so"
         "CVE66118" -> "$nativeDir/libk66118.so"
         "CVE66127" -> "$nativeDir/libk66127.so"

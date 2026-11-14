@@ -2561,12 +2561,23 @@ class MainActivity : ComponentActivity() {
                 val cmd = when (exploit) {
                     ExploitKind.CVE61821 -> arrayOf(
                         if (isPlantCore61821())
-                            "$nativeDir/libk61821p.so" else "$nativeDir/libk61821.so",
+                            if (BuildConfig.VIVO_IQOO_SUPPORT)
+                                "$nativeDir/libk61821p.so"
+                            else
+                                "$nativeDir/libk61821x.so"
+                        else
+                            "$nativeDir/libk61821.so",
                         "run"
                     )
                     ExploitKind.CVE61269 -> arrayOf("$nativeDir/libk61269.so", "run")
                     ExploitKind.CVE61238 -> arrayOf("$nativeDir/libk61238.so", "run")
-                    ExploitKind.CVE61258 -> arrayOf("$nativeDir/libk61258.so", "run")
+                    ExploitKind.CVE61258 -> arrayOf(
+                        if (BuildConfig.VIVO_IQOO_SUPPORT)
+                            "$nativeDir/libk61258.so"
+                        else
+                            "$nativeDir/libk61258x.so",
+                        "run"
+                    )
                     ExploitKind.CVE61223 -> arrayOf("$nativeDir/libk61223.so", "run")
                     ExploitKind.CVE66118 -> arrayOf("$nativeDir/libk66118.so", "run")
                     ExploitKind.CVE66127 -> arrayOf("$nativeDir/libk66127.so", "run")

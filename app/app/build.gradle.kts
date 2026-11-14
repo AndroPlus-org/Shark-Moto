@@ -6,6 +6,12 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) FileInputStream(keystorePropsFile).use { load(it) }
 }
 
+/* vivo/iQOO support is build-time switchable: the sources and the kernel
+ * table stay in the tree, but the shipped APK can drop those devices and
+ * the vivo-only native payloads.  Build the full package with
+ * -PsharkVivo=true. */
+val vivoIqoo = (findProperty("sharkVivo") ?: "false").toString().toBoolean()
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -29,6 +35,7 @@ android {
         ndk {
             abiFilters.add("arm64-v8a")
         }
+        buildConfigField("boolean", "VIVO_IQOO_SUPPORT", vivoIqoo.toString())
     }
     buildFeatures {
         compose = true
@@ -59,6 +66,19 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            if (!vivoIqoo) {
+                excludes += setOf(
+                    "lib/arm64-v8a/libk61223.so",
+                    "lib/arm64-v8a/libk66127.so",
+                    "lib/arm64-v8a/libk61258.so",
+                    "lib/arm64-v8a/libk61821p.so"
+                )
+            } else {
+                excludes += setOf(
+                    "lib/arm64-v8a/libk61258x.so",
+                    "lib/arm64-v8a/libk61821x.so"
+                )
+            }
             keepDebugSymbols.add("**/libk61821.so")
             keepDebugSymbols.add("**/libksud_universal.so")
             keepDebugSymbols.add("**/libk61269.so")
