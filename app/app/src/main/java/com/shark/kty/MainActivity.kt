@@ -182,7 +182,7 @@ import com.itos.coui.theme.LocalCouiContentColor
 import com.itos.coui.topappbar.TopAppBar
 import com.itos.coui.topappbar.TopAppBarButton
 
-private const val PROJECT_URL = "https://github.com/Yunnijian/Shark"
+private const val PROJECT_URL = "https://github.com/CYB3R0ID694/Shark-Moto"
 
 private data class LicenseText(
     val name: String,
