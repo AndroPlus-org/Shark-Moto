@@ -1750,7 +1750,7 @@ class MainActivity : ComponentActivity() {
                 title = AppStrings.rootManager(appLanguage),
                 values = managerChoices(),
                 selected = manager,
-                label = { it.fullLabel }
+                label = { it.displayLabel(appLanguage) }
             ) { selectManager(it) }
             Divider(startIndent = itemDividerIndent())
             SettingItem(
@@ -1941,7 +1941,7 @@ class MainActivity : ComponentActivity() {
                             title = AppStrings.hotSwitchManager(appLanguage),
                             values = hotManagerChoices(),
                             selected = hotManager,
-                            label = { it.fullLabel }
+                            label = { it.displayLabel(appLanguage) }
                         ) { target ->
                             hotManager = target
                             switchHotManager(target)
@@ -2842,7 +2842,7 @@ class MainActivity : ComponentActivity() {
         if (hotSwitchBusy || kind == ManagerKind.DYNAMIC) return
         hotSwitchBusy = true
         lifecycleScope.launch(Dispatchers.IO) {
-            val pkg = kind.pkg
+            val pkg = resolveInstalledManagerPkg(kind)
             val appInfo = runCatching {
                 packageManager.getPackageInfo(pkg, 0).applicationInfo
             }.getOrNull()
@@ -2922,9 +2922,11 @@ class MainActivity : ComponentActivity() {
     )
 
     private fun launchManager() {
-        val intent = packageManager.getLaunchIntentForPackage(manager.pkg)
+        val targetPkg = resolveInstalledManagerPkg(manager)
+        val intent = packageManager.getLaunchIntentForPackage(targetPkg)
+            ?: packageManager.getLaunchIntentForPackage(manager.pkg)
         if (intent == null) {
-            addLog("Manager launch entry not found: ${manager.pkg}")
+            addLog("Manager launch entry not found: $targetPkg")
             return
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
@@ -2940,7 +2942,12 @@ class MainActivity : ComponentActivity() {
         busy = true
         val softReboot = softRebootAfter
         val startedAt = System.currentTimeMillis()
-        HistoryStore.start(applicationContext, manager.fullLabel, exploit.fullLabel, kernelVersion, deviceModel)
+        val activeLabel = if (resolveInstalledManagerPkg(manager) == ManagerKind.NEXT_SPOOFED.pkg) {
+            ManagerKind.NEXT_SPOOFED.fullLabel
+        } else {
+            manager.fullLabel
+        }
+        HistoryStore.start(applicationContext, activeLabel, exploit.fullLabel, kernelVersion, deviceModel)
         lifecycleScope.launch(Dispatchers.IO) {
             var success = false
             var exit = -1
@@ -2960,13 +2967,14 @@ class MainActivity : ComponentActivity() {
                     return@launch
                 }
                 val (alreadyActive, _) = readDeviceState()
+                val targetPkg = resolveInstalledManagerPkg(manager)
                 val ksudPreflight = PrivService.newProcess(
                     arrayOf("sh", "-c",
-                        "[ -n \"$(pm path '${manager.pkg}' 2>/dev/null)\" ] || [ -x /data/adb/ksu/bin/ksud ] || [ -x /data/adb/ksud ]"),
+                        "[ -n \"$(pm path '$targetPkg' 2>/dev/null)\" ] || [ -n \"$(pm path '${manager.pkg}' 2>/dev/null)\" ] || [ -x /data/adb/ksu/bin/ksud ] || [ -x /data/adb/ksud ]"),
                     shizukuEnv(), "/"
                 ).waitFor()
                 if (ksudPreflight != 0) {
-                    addLog("Manager not installed: ${manager.pkg}. Install the manager APK first; ksud is executed from its APK, no bundled copy.")
+                    addLog("Manager not installed: $targetPkg. Install the manager APK first; ksud is executed from its APK, no bundled copy.")
                     return@launch
                 }
                 val nativeDir = applicationInfo.nativeLibraryDir
@@ -3049,6 +3057,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun runStreaming(cmd: Array<String>, dir: String): Int {
+        val targetPkg = resolveInstalledManagerPkg(manager)
         val cfg = JailbreakCore.EnvConfig(
             kind = exploit.name,
             release = kernelVersion,
@@ -3058,7 +3067,8 @@ class MainActivity : ComponentActivity() {
             susfsSupport = susfsSupport,
             vfsSupport = vfsSupport,
             universal = dynamicSwitching && supportsUniversal(),
-            chaseRetry = chaseRetry
+            chaseRetry = chaseRetry,
+            customManagerPkg = targetPkg
         )
         val env = JailbreakCore.buildEnv(applicationContext, cfg, dir)
         return JailbreakCore.runStreaming(cmd, env, dir) { addLog(it) }
@@ -3101,9 +3111,35 @@ class MainActivity : ComponentActivity() {
         KERNELSU("KernelSU", "me.weishu.kernelsu", "kernelsu"),
         FINASU("FinaSU", "me.yuki.fina", "finasu"),
         NEXT("KernelSU Next", "com.rifsxd.ksunext", "next"),
+        NEXT_SPOOFED("KernelSU Next (Spoofed)", "kqvdie.zeykvw.hpbcyd", "next_spoofed"),
         BAKASU("BakaSU", "com.resukisu.resukisu", "bakasu"),
         SUKISU("SukiSU Ultra", "com.sukisu.ultra", "sukisu"),
-        DYNAMIC("Dynamic Switching", "me.weishu.kernelsu", "kernelsu")
+        DYNAMIC("Dynamic Switching", "me.weishu.kernelsu", "kernelsu");
+
+        fun displayLabel(lang: AppLanguage): String = when (this) {
+            NEXT_SPOOFED -> if (lang == AppLanguage.ZH) "KernelSU Next (伪装版)" else "KernelSU Next (Spoofed)"
+            DYNAMIC -> if (lang == AppLanguage.ZH) "动态切换" else "Dynamic Switching"
+            else -> fullLabel
+        }
+    }
+
+    private fun isPackageInstalled(pkg: String): Boolean {
+        if (runCatching { packageManager.getPackageInfo(pkg, 0) }.isSuccess) return true
+        return runCatching {
+            val (rc, out) = runRootCommand("pm path '$pkg' 2>/dev/null", 5)
+            rc == 0 && out.contains("package:")
+        }.getOrDefault(false)
+    }
+
+    private fun resolveInstalledManagerPkg(kind: ManagerKind): String {
+        if (isPackageInstalled(kind.pkg)) return kind.pkg
+        if (kind == ManagerKind.NEXT && isPackageInstalled(ManagerKind.NEXT_SPOOFED.pkg)) {
+            return ManagerKind.NEXT_SPOOFED.pkg
+        }
+        if (kind == ManagerKind.NEXT_SPOOFED && isPackageInstalled(ManagerKind.NEXT.pkg)) {
+            return ManagerKind.NEXT.pkg
+        }
+        return kind.pkg
     }
 
     private fun isVivoV2505a(): Boolean =

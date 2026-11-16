@@ -106,7 +106,24 @@ class AutoJailbreakService : Service() {
         }
 
         val managerKind = prefs.getString("manager", "KERNELSU") ?: "KERNELSU"
-        val managerPkg = JailbreakCore.managerRuntime(managerKind).second
+        var managerPkg = JailbreakCore.managerRuntime(managerKind).second
+        if (managerKind == "NEXT") {
+            val hasNext = runCatching { packageManager.getPackageInfo(managerPkg, 0) }.isSuccess
+            if (!hasNext) {
+                val hasSpoofed = runCatching { packageManager.getPackageInfo("kqvdie.zeykvw.hpbcyd", 0) }.isSuccess
+                if (hasSpoofed) {
+                    managerPkg = "kqvdie.zeykvw.hpbcyd"
+                }
+            }
+        } else if (managerKind == "NEXT_SPOOFED") {
+            val hasSpoofed = runCatching { packageManager.getPackageInfo(managerPkg, 0) }.isSuccess
+            if (!hasSpoofed) {
+                val hasNext = runCatching { packageManager.getPackageInfo("com.rifsxd.ksunext", 0) }.isSuccess
+                if (hasNext) {
+                    managerPkg = "com.rifsxd.ksunext"
+                }
+            }
+        }
         val preflight = runCatching {
             PrivService.newProcess(
                 arrayOf(
@@ -142,9 +159,8 @@ class AutoJailbreakService : Service() {
                 susfsSupport = prefs.getBoolean("susfs_support", false),
                 vfsSupport = prefs.getBoolean("vfs_support", false),
                 universal = managerKind == "DYNAMIC" && JailbreakCore.supportsUniversal(kind),
-                chaseRetry = prefs.getBoolean(
-                    "chase_retry", JailbreakCore.defaultChaseRetry(kind)
-                )
+                chaseRetry = prefs.getBoolean("chase_retry", JailbreakCore.defaultChaseRetry(kind)),
+                customManagerPkg = managerPkg
             )
             val env = JailbreakCore.buildEnv(applicationContext, cfg, nativeDir)
             val model = JailbreakCore.resolveDeviceName()

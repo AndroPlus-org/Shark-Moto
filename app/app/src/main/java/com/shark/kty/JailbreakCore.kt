@@ -114,6 +114,7 @@ object JailbreakCore {
     fun managerRuntime(kindName: String): Pair<String, String> = when (kindName) {
         "FINASU" -> "finasu" to "me.yuki.fina"
         "NEXT" -> "next" to "com.rifsxd.ksunext"
+        "NEXT_SPOOFED" -> "next_spoofed" to "kqvdie.zeykvw.hpbcyd"
         "BAKASU" -> "bakasu" to "com.resukisu.resukisu"
         "SUKISU" -> "sukisu" to "com.sukisu.ultra"
         else -> "kernelsu" to "me.weishu.kernelsu"
@@ -122,6 +123,7 @@ object JailbreakCore {
     fun managerLabel(kindName: String): String = when (kindName) {
         "FINASU" -> "FinaSU"
         "NEXT" -> "KernelSU Next"
+        "NEXT_SPOOFED" -> "KernelSU Next (Spoofed)"
         "BAKASU" -> "BakaSU"
         "SUKISU" -> "SukiSU Ultra"
         "DYNAMIC" -> "Dynamic Switching"
@@ -164,11 +166,13 @@ object JailbreakCore {
         val susfsSupport: Boolean,
         val vfsSupport: Boolean,
         val universal: Boolean,
-        val chaseRetry: Boolean
+        val chaseRetry: Boolean,
+        val customManagerPkg: String? = null
     )
 
     fun buildEnv(context: Context, cfg: EnvConfig, dir: String): Array<String> {
         val runtime = managerRuntime(cfg.managerKind)
+        val managerPkg = cfg.customManagerPkg?.takeIf { it.isNotBlank() } ?: runtime.second
         val gate = isGateKernel(cfg.kind, cfg.release)
         val susfsActive = cfg.susfsSupport && supportsSusfs(cfg.kind, gate)
         val susfsKo =
@@ -179,6 +183,7 @@ object JailbreakCore {
             "HOME=/",
             "PYB110_DIR=$dir",
             "PYB110_MANAGER=${runtime.first}",
+            "PYB110_MANAGER_PKG=$managerPkg",
             "PYB110_LATE_LOAD=1",
             "PYB110_UNLOAD_GUARD=${if (cfg.unloadGuard && !Build.MANUFACTURER.equals("motorola", ignoreCase = true)) "1" else "0"}",
             "PYB110_GATE=${if (gate) "1" else "0"}",
