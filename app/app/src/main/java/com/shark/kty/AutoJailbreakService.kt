@@ -28,7 +28,9 @@ class AutoJailbreakService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannel()
-        val first = notification("准备自动越狱…")
+        val prefs = getSharedPreferences("pyb110", MODE_PRIVATE)
+        val lang = AppLanguage.fromCode(prefs.getString("app_language", "en"))
+        val first = notification(AppStrings.autoJailbreakPreparing(lang))
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
                 NOTIF_ID, first, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
@@ -36,7 +38,6 @@ class AutoJailbreakService : Service() {
         } else {
             startForeground(NOTIF_ID, first)
         }
-        val prefs = getSharedPreferences("pyb110", MODE_PRIVATE)
         if (!prefs.getBoolean("auto_jailbreak", false)) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -49,7 +50,7 @@ class AutoJailbreakService : Service() {
             try {
                 runAuto()
             } catch (t: Throwable) {
-                finishNotify("自动越狱异常：${t.message}")
+                finishNotify("Auto jailbreak error: ${t.message}")
             } finally {
                 runCatching { wake.release() }
                 stopSelf()
@@ -61,6 +62,7 @@ class AutoJailbreakService : Service() {
     private suspend fun runAuto() {
         val prefs = getSharedPreferences("pyb110", MODE_PRIVATE)
         if (!prefs.getBoolean("auto_jailbreak", false)) return
+        val lang = AppLanguage.fromCode(prefs.getString("app_language", "en"))
 
         /* A panic during the last auto attempt leaves the flag set; do not
          * keep bootlooping: drop the switch and say why. */
@@ -69,12 +71,12 @@ class AutoJailbreakService : Service() {
             val reason = getprop("ro.boot.bootreason")
             if (reason.contains("kernel_panic") || reason.contains("watchdog")) {
                 prefs.edit().putBoolean("auto_jailbreak", false).apply()
-                finishNotify("上次自动越狱引发重启，已关闭开机自动越狱")
+                finishNotify(AppStrings.autoJailbreakPanicDisabled(lang))
                 return
             }
         }
 
-        updateNotification("等待 Stellar/Shizuku…")
+        updateNotification(AppStrings.autoJailbreakWaitingPriv(lang))
         var backend = false
         for (i in 0 until 30) {
             if (PrivService.pick() != null) {
@@ -84,11 +86,11 @@ class AutoJailbreakService : Service() {
             delay(2000)
         }
         if (!backend) {
-            finishNotify("Stellar/Shizuku 未就绪，跳过自动越狱")
+            finishNotify(AppStrings.autoJailbreakPrivNotReady(lang))
             return
         }
         if (!PrivService.granted()) {
-            finishNotify("未授权 Stellar/Shizuku，请打开 Shark 授权")
+            finishNotify(AppStrings.autoJailbreakPrivNotGranted(lang))
             return
         }
 
@@ -96,12 +98,12 @@ class AutoJailbreakService : Service() {
             .getOrDefault(JailbreakCore.KERNEL_UNKNOWN)
         val kind = JailbreakCore.kindFor(release)
         if (kind == null) {
-            finishNotify("当前内核不支持自动越狱：$release")
+            finishNotify(AppStrings.autoJailbreakKernelUnsupported(release, lang))
             return
         }
         val active = runCatching { JailbreakCore.readDeviceState().first }.getOrDefault(false)
         if (active) {
-            finishNotify("KernelSU 已在运行，跳过自动越狱")
+            finishNotify(AppStrings.autoJailbreakAlreadyActive(lang))
             return
         }
 
@@ -133,11 +135,11 @@ class AutoJailbreakService : Service() {
             ).waitFor()
         }.getOrDefault(-1)
         if (preflight != 0) {
-            finishNotify("未安装管理器 $managerPkg，跳过自动越狱")
+            finishNotify(AppStrings.autoJailbreakManagerNotInstalled(managerPkg, lang))
             return
         }
         if (!RunLock.tryAcquire()) {
-            finishNotify("已有越狱任务在运行，跳过自动越狱")
+            finishNotify(AppStrings.actionRunning(lang))
             return
         }
         try {
@@ -145,7 +147,7 @@ class AutoJailbreakService : Service() {
             val nativeDir = applicationInfo.nativeLibraryDir
             val lib = JailbreakCore.runnerLib(nativeDir, kind, release)
             if (lib == null) {
-                finishNotify("当前内核不支持自动越狱：$release")
+                finishNotify(AppStrings.autoJailbreakKernelUnsupported(release, lang))
                 return
             }
             val cfg = JailbreakCore.EnvConfig(
@@ -158,14 +160,15 @@ class AutoJailbreakService : Service() {
                 vfsSupport = prefs.getBoolean("vfs_support", false),
                 universal = managerKind == "DYNAMIC" && JailbreakCore.supportsUniversal(kind),
                 chaseRetry = prefs.getBoolean("chase_retry", JailbreakCore.defaultChaseRetry(kind)),
-                customManagerPkg = managerPkg
+                customManagerPkg = managerPkg,
+                safeModeModules = prefs.getBoolean("safe_mode_modules", false)
             )
             val env = JailbreakCore.buildEnv(applicationContext, cfg, nativeDir)
             val model = JailbreakCore.resolveDeviceName()
             HistoryStore.start(
                 applicationContext, JailbreakCore.managerLabel(managerKind), kind, release, model
             )
-            updateNotification("越狱进行中…")
+            updateNotification(AppStrings.autoJailbreakInProgress(lang))
             var lastLine = ""
             val startedAt = System.currentTimeMillis()
             val rc = JailbreakCore.runStreaming(arrayOf(lib, "run"), env, nativeDir) { line ->
@@ -177,10 +180,10 @@ class AutoJailbreakService : Service() {
             val success = rc == 0 && ok
             HistoryStore.finish(success, rc, System.currentTimeMillis() - startedAt)
             if (success) {
-                finishNotify("自动越狱成功，KernelSU 已加载")
+                finishNotify(AppStrings.autoJailbreakSuccess(lang))
             } else {
-                val tail = if (lastLine.isNotBlank()) "（$lastLine）" else ""
-                finishNotify("自动越狱失败 exit=$rc$tail，打开 Shark 查看日志")
+                val tail = if (lastLine.isNotBlank()) " ($lastLine)" else ""
+                finishNotify(AppStrings.autoJailbreakFailed(rc, tail, lang))
             }
         } finally {
             prefs.edit().putBoolean("auto_attempt", false).apply()

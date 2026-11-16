@@ -467,8 +467,14 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("pyb110", MODE_PRIVATE)
         legalAccepted = prefs.getBoolean("legal_accepted", false)
         val savedLang = prefs.getString("app_language", null)
-        val systemIsZh = java.util.Locale.getDefault().language.startsWith("zh")
-        appLanguage = if (savedLang == "zh" || (savedLang == null && systemIsZh)) AppLanguage.ZH else AppLanguage.EN
+        val sysLang = java.util.Locale.getDefault().language
+        appLanguage = when {
+            savedLang != null -> AppLanguage.fromCode(savedLang)
+            sysLang.startsWith("zh") -> AppLanguage.ZH
+            sysLang.startsWith("ru") -> AppLanguage.RU
+            sysLang.startsWith("pt") -> AppLanguage.PT
+            else -> AppLanguage.EN
+        }
         languageChosen = prefs.getBoolean("language_chosen", legalAccepted)
         val savedManager = prefs.getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
@@ -546,7 +552,7 @@ class MainActivity : ComponentActivity() {
             )
             Spacer(Modifier.height(36.dp))
 
-            val options = listOf(AppLanguage.EN, AppLanguage.ZH)
+            val options = AppLanguage.entries
             for (opt in options) {
                 val isSel = opt == selected
                 Box(
@@ -629,7 +635,7 @@ class MainActivity : ComponentActivity() {
         var laidOut by remember { mutableStateOf(false) }
         var readDone by remember { mutableStateOf(false) }
         val isZh = appLanguage == AppLanguage.ZH
-        val legalPhrase = if (isZh) AppStrings.legalPhraseZh else AppStrings.legalPhraseEn
+        val legalPhrase = AppStrings.legalPhrase(appLanguage)
 
         LaunchedEffect(Unit) {
             withFrameNanos { }
@@ -674,7 +680,7 @@ class MainActivity : ComponentActivity() {
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = if (isZh) "English" else "中文",
+                        text = appLanguage.nativeName,
                         kind = CouiTextKind.Description,
                         color = scheme.accent
                     )
@@ -697,11 +703,11 @@ class MainActivity : ComponentActivity() {
             ) {
                 LegalSection(
                     AppStrings.legalDisclaimerSectionTitle(appLanguage),
-                    if (isZh) AppStrings.legalDisclaimerPointsZh else AppStrings.legalDisclaimerPointsEn
+                    AppStrings.legalDisclaimerPoints(appLanguage)
                 )
                 LegalSection(
                     AppStrings.legalLicenseSectionTitle(appLanguage),
-                    if (isZh) AppStrings.legalLicensePointsZh else AppStrings.legalLicensePointsEn
+                    AppStrings.legalLicensePoints(appLanguage)
                 )
                 Text(
                     text = AppStrings.legalEnd(appLanguage),
@@ -875,7 +881,8 @@ class MainActivity : ComponentActivity() {
                         .putBoolean("legal_accepted", true).apply()
                 },
                 onToggleLanguage = {
-                    val next = if (appLanguage == AppLanguage.EN) AppLanguage.ZH else AppLanguage.EN
+                    val nextIdx = (appLanguage.ordinal + 1) % AppLanguage.entries.size
+                    val next = AppLanguage.entries[nextIdx]
                     appLanguage = next
                     getSharedPreferences("pyb110", MODE_PRIVATE).edit()
                         .putString("app_language", next.code)
@@ -3136,8 +3143,18 @@ class MainActivity : ComponentActivity() {
         DYNAMIC("Dynamic Switching", "me.weishu.kernelsu", "kernelsu");
 
         fun displayLabel(lang: AppLanguage): String = when (this) {
-            NEXT_SPOOFED -> if (lang == AppLanguage.ZH) "KernelSU Next (伪装版)" else "KernelSU Next (Spoofed)"
-            DYNAMIC -> if (lang == AppLanguage.ZH) "动态切换" else "Dynamic Switching"
+            NEXT_SPOOFED -> when (lang) {
+                AppLanguage.ZH -> "KernelSU Next (伪装版)"
+                AppLanguage.RU -> "KernelSU Next (Маскированный)"
+                AppLanguage.PT -> "KernelSU Next (Camuflado)"
+                else -> "KernelSU Next (Spoofed)"
+            }
+            DYNAMIC -> when (lang) {
+                AppLanguage.ZH -> "动态切换"
+                AppLanguage.RU -> "Динамическое переключение"
+                AppLanguage.PT -> "Troca Dinâmica"
+                else -> "Dynamic Switching"
+            }
             else -> fullLabel
         }
     }
