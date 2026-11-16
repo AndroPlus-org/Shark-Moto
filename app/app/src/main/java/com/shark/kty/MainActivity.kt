@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Copyright
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DeveloperBoard
 import androidx.compose.material.icons.filled.Extension
@@ -300,6 +301,7 @@ class MainActivity : ComponentActivity() {
     private var languageChosen by mutableStateOf(false)
     private var appLanguage by mutableStateOf(AppLanguage.EN)
     private var showLanguageDialog by mutableStateOf(false)
+    private var amoledBlack by mutableStateOf(false)
     private var safeModeModules by mutableStateOf(false)
     private var selinuxPermissive by mutableStateOf(false)
     private var historyEntries by mutableStateOf(listOf<HistoryEntry>())
@@ -484,6 +486,7 @@ class MainActivity : ComponentActivity() {
             else -> AppLanguage.EN
         }
         languageChosen = prefs.getBoolean("language_chosen", legalAccepted)
+        amoledBlack = prefs.getBoolean("amoled_black", false)
         safeModeModules = prefs.getBoolean("safe_mode_modules", false)
         val savedManager = prefs.getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
@@ -901,6 +904,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val dark = CouiTheme.isDark
+        val scheme = CouiTheme.colorScheme
         val overlayVisible = showManual || showExtras
         BackHandler(
             enabled = aboutLicense != null || showManual || showExtras ||
@@ -915,6 +919,7 @@ class MainActivity : ComponentActivity() {
         }
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            containerColor = if (amoledBlack && dark) Color.Black else scheme.background,
             topBar = {
                 when {
                     showExtras -> AppTopBar(AppStrings.titleExtras(appLanguage), onBack = { showExtras = false })
@@ -2016,6 +2021,17 @@ class MainActivity : ComponentActivity() {
                                     Toast.makeText(this@MainActivity, AppStrings.selinuxSwitched(modeName, appLanguage), Toast.LENGTH_SHORT).show()
                                 }
                             }
+                        }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingSwitchItem(
+                        icon = Icons.Filled.DarkMode,
+                        title = AppStrings.amoledMode(appLanguage),
+                        summary = AppStrings.amoledSummary(appLanguage),
+                        checked = amoledBlack,
+                        onCheckedChange = { checked ->
+                            amoledBlack = checked
+                            getSharedPreferences("pyb110", MODE_PRIVATE).edit().putBoolean("amoled_black", checked).apply()
                         }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
