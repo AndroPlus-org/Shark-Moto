@@ -29,6 +29,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -69,6 +70,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Copyright
 import androidx.compose.material.icons.filled.DeveloperBoard
@@ -78,6 +80,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -287,6 +290,9 @@ class MainActivity : ComponentActivity() {
     private var showManual by mutableStateOf(false)
     private var showExtras by mutableStateOf(false)
     private var legalAccepted by mutableStateOf(false)
+    private var languageChosen by mutableStateOf(false)
+    private var appLanguage by mutableStateOf(AppLanguage.EN)
+    private var showLanguageDialog by mutableStateOf(false)
     private var historyEntries by mutableStateOf(listOf<HistoryEntry>())
     private var historyDetail by mutableStateOf<HistoryEntry?>(null)
     private var historyDetailText by mutableStateOf("")
@@ -357,7 +363,8 @@ class MainActivity : ComponentActivity() {
 
     private fun checkForUpdatesManually() {
         if (updateDownloading) return
-        Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        val isZh = appLanguage == AppLanguage.ZH
+        Toast.makeText(this, if (isZh) "正在检查更新…" else "Checking for updates…", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             when (val result = runCatching {
                 UpdateChecker.check(applicationContext)
@@ -369,10 +376,10 @@ class MainActivity : ComponentActivity() {
                     updateDialogVisible = true
                 }
                 UpdateCheckResult.UpToDate -> {
-                    Toast.makeText(this@MainActivity, "Already up to date", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, if (isZh) "已是最新版本" else "Already up to date", Toast.LENGTH_SHORT).show()
                 }
                 else -> {
-                    Toast.makeText(this@MainActivity, "Update check failed, please try again later", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, if (isZh) "检查更新失败，请稍后重试" else "Update check failed, please try again later", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -456,9 +463,13 @@ class MainActivity : ComponentActivity() {
         unloadGuard = getSharedPreferences("pyb110", MODE_PRIVATE).getBoolean("unload_guard", true)
         susfsSupport = getSharedPreferences("pyb110", MODE_PRIVATE).getBoolean("susfs_support", false)
         vfsSupport = getSharedPreferences("pyb110", MODE_PRIVATE).getBoolean("vfs_support", false)
-        legalAccepted = getSharedPreferences("pyb110", MODE_PRIVATE)
-            .getBoolean("legal_accepted", false)
-        val savedManager = getSharedPreferences("pyb110", MODE_PRIVATE).getString("manager", null)
+        val prefs = getSharedPreferences("pyb110", MODE_PRIVATE)
+        legalAccepted = prefs.getBoolean("legal_accepted", false)
+        val savedLang = prefs.getString("app_language", null)
+        val systemIsZh = java.util.Locale.getDefault().language.startsWith("zh")
+        appLanguage = if (savedLang == "zh" || (savedLang == null && systemIsZh)) AppLanguage.ZH else AppLanguage.EN
+        languageChosen = prefs.getBoolean("language_chosen", legalAccepted)
+        val savedManager = prefs.getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
         kernelVersion = runCatching { android.system.Os.uname().release }.getOrDefault("Unknown")
         exploit = JailbreakCore.kindFor(kernelVersion)?.let {
@@ -485,9 +496,6 @@ class MainActivity : ComponentActivity() {
 
     /* ===== Root chrome ===== */
 
-    private val legalPhrase =
-        "我已确认能接受使用该工具可能造成的相关后果并承诺遵守开源协议"
-
     @Composable
     private fun LegalSection(title: String, lines: List<String>) {
         Text(text = title, kind = CouiTextKind.SectionTitle, color = CouiTheme.colorScheme.accent)
@@ -500,12 +508,127 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun LegalGate(onAccept: () -> Unit) {
+    private fun LanguageGate(onAccept: (AppLanguage) -> Unit) {
+        val scheme = CouiTheme.colorScheme
+        var selected by remember { mutableStateOf(appLanguage) }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(scheme.background)
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(32.dp))
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(scheme.surface),
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(Icons.Filled.Language, null, Modifier.size(38.dp), tint = scheme.accent)
+            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = AppStrings.langGateTitle(selected),
+                kind = CouiTextKind.PageTitle,
+                color = scheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = AppStrings.langGateSubtitle(selected),
+                kind = CouiTextKind.Description,
+                color = scheme.onSurface.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(36.dp))
+
+            val options = listOf(AppLanguage.EN, AppLanguage.ZH)
+            for (opt in options) {
+                val isSel = opt == selected
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isSel) scheme.surface else scheme.card)
+                        .border(
+                            width = if (isSel) 2.dp else 1.dp,
+                            color = if (isSel) scheme.accent else scheme.onSurface.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .clickable { selected = opt }
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = opt.nativeName,
+                                kind = CouiTextKind.SectionTitle,
+                                color = if (isSel) scheme.accent else scheme.onSurface
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = opt.title,
+                                kind = CouiTextKind.Description,
+                                color = scheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSel) scheme.accent else Color.Transparent)
+                                .border(
+                                    2.dp,
+                                    if (isSel) scheme.accent else scheme.onSurface.copy(alpha = 0.3f),
+                                    RoundedCornerShape(12.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSel) {
+                                AppIcon(Icons.Filled.Check, null, Modifier.size(16.dp), tint = Color.White)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(scheme.accent)
+                    .clickable { onAccept(selected) }
+                    .padding(vertical = 15.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = AppStrings.langGateContinue(selected),
+                    kind = CouiTextKind.SectionTitle,
+                    color = Color.White
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+
+    @Composable
+    private fun LegalGate(onAccept: () -> Unit, onToggleLanguage: () -> Unit) {
         val scheme = CouiTheme.colorScheme
         val scroll = rememberScrollState()
         var input by remember { mutableStateOf("") }
         var laidOut by remember { mutableStateOf(false) }
         var readDone by remember { mutableStateOf(false) }
+        val isZh = appLanguage == AppLanguage.ZH
+        val legalPhrase = if (isZh) AppStrings.legalPhraseZh else AppStrings.legalPhraseEn
+
         LaunchedEffect(Unit) {
             withFrameNanos { }
             laidOut = true
@@ -516,7 +639,12 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(laidOut, atBottom) {
             if (laidOut && atBottom) readDone = true
         }
-        val matched = input.trim() == legalPhrase
+        val matched = if (isZh) {
+            input.trim() == legalPhrase
+        } else {
+            input.trim().equals(legalPhrase, ignoreCase = true)
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -525,14 +653,34 @@ class MainActivity : ComponentActivity() {
                 .imePadding()
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
-            Text(
-                text = "免责声明与开源协议",
-                kind = CouiTextKind.SectionTitle,
-                color = scheme.accent
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = AppStrings.legalTitle(appLanguage),
+                    kind = CouiTextKind.SectionTitle,
+                    color = scheme.accent,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(scheme.surface)
+                        .border(1.dp, scheme.accent.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .clickable { onToggleLanguage() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (isZh) "English" else "中文",
+                        kind = CouiTextKind.Description,
+                        color = scheme.accent
+                    )
+                }
+            }
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "使用本工具前，请完整阅读以下内容；确认一次后不再弹出。不认同其中任何一条，请立即退出并卸载。",
+                text = AppStrings.legalIntro(appLanguage),
                 kind = CouiTextKind.Description,
                 color = scheme.onSurface.copy(alpha = 0.7f)
             )
@@ -546,40 +694,15 @@ class MainActivity : ComponentActivity() {
                     .padding(16.dp)
             ) {
                 LegalSection(
-                    "免责声明",
-                    listOf(
-                        "1. 本工具仅限用于您本人拥有或已获得明确授权的设备，用于系统研究、学习与日常维护。严禁用于任何未经授权的设备、他人财产或非法用途；由此产生的一切后果由使用者自行承担。",
-                        "2. 本工具通过利用系统内核漏洞实现临时越狱与提权，属于对操作系统运行时行为的深度修改，其行为方式与常规应用程序有本质区别，可能被杀毒软件、企业 MDM 或应用商店安全扫描标记为风险程序。",
-                        "3. 使用过程中可能出现设备重启、卡死、无法开机、数据丢失、系统分区损坏等情况；严重时可能需要刷机恢复出厂设置甚至送修。请在操作前完整备份重要数据（照片、聊天记录、密钥、银行与支付凭证等），并确认自己具备恢复设备的能力。",
-                        "4. 越狱会削弱或绕过系统的部分安全机制（包括 SELinux、签名校验与启动链完整性检查），设备在越狱期间及其后一段时间内更容易受到恶意软件攻击，银行、支付、政务、企业办公等敏感应用可能拒绝运行或检测到环境异常。",
-                        "5. 越狱后设备的保修与售后政策可能受影响；系统 OTA 更新可能失败、被阻断，或因版本校验不匹配导致设备无法启动。是否保留 Root、何时撤销、何时更新系统，由您自行判断并承担风险。",
-                        "6. 本工具按「现状」提供，不附带任何明示或默示的担保，包括但不限于适销性、特定用途适用性、稳定运行与不侵权的担保。作者不承诺本工具适用于任何特定设备、系统版本或使用场景。",
-                        "7. 在适用法律允许的最大范围内，作者与贡献者不对因使用或无法使用本工具造成的任何直接、间接、偶然、特殊或后果性损失承担责任，包括但不限于数据损失、利润损失、业务中断、设备损坏、保修失效与第三方索赔。",
-                        "8. 您应确保使用行为符合所在地法律法规以及设备所属组织（如雇主、学校）的管理规定；不得利用本工具绕过他人设备的安全机制、规避计费、破解受保护内容、干扰公共网络或从事任何侵权活动。",
-                        "9. 本工具不提供账户、订阅或云端服务，不收集、不上传您的个人数据，全部操作均在您的设备本地完成。非官方渠道分发的构建版本可能与源码存在差异或含额外改动，请仅从官方仓库获取并自行核对。",
-                        "10. 是否使用本工具、在哪些设备上使用、使用到何种程度，完全由您自行决定。若您对上述任何风险存在疑虑，或无法承担相应后果，请立即退出并卸载本工具。",
-                        "11. 本工具包含的第三方组件、预编译库与素材分别遵循其自身许可证，相关声明见应用内「关于 — 许可」页面与随仓库分发的 NOTICE 文件；这些组件不因本声明的签署而改变其许可条件。",
-                        "12. 作者保留在不另行通知的情况下修改、暂停或终止本项目及其任何功能的权利；条文更新后若您继续使用，即视为接受更新后的全部内容。"
-                    )
+                    AppStrings.legalDisclaimerSectionTitle(appLanguage),
+                    if (isZh) AppStrings.legalDisclaimerPointsZh else AppStrings.legalDisclaimerPointsEn
                 )
                 LegalSection(
-                    "开源许可（GNU GPLv3）",
-                    listOf(
-                        "1. 本项目（含应用程序与内核载荷源码）以 GNU 通用公共许可证第 3 版（GPLv3）发布，许可证全文见项目根目录的 LICENSE 文件，二者内容不一致时以 LICENSE 全文为准。",
-                        "2. 您享有运行、研究、修改与再分发本程序的自由，但行使上述自由的前提是完整遵守 GPLv3 的全部条款。",
-                        "3. 再分发本程序或其修改版本时，必须保留原有的版权声明与许可证文本；在修改过的文件中显著标明修改内容及修改日期；并向接收者提供完整的对应源代码（§5）。",
-                        "4. 以目标代码（二进制）形式分发时，必须同时以不高于实际分发成本的合理方式提供对应源代码，或提供有效期不少于三年的书面获取承诺（§6）。",
-                        "5. 通过用户产品（如预装设备、定制固件）分发时，还须提供必要的「安装信息」，使接收者能够在其设备上安装修改后的版本（§6，防止通过硬件限制架空许可证）。",
-                        "6. 您不得对 GPLv3 授予的权利附加任何额外限制；分发时不得附加与本许可证冲突的条款，亦不得对接收者行使许可证权利收取许可费（§7、§10）。",
-                        "7. 本程序的贡献者授予您非排他性的专利许可；若您对任何贡献者发起专利诉讼，您依据本许可证获得的专利许可将相应终止（§11）。",
-                        "8. 许可证授权在您违反条款时自动终止；若您在收到通知后 30 天内纠正违规行为，授权可自纠正之日起恢复（§8）。",
-                        "9. 本程序不提供任何担保；在适用法律允许的范围内，作者与贡献者不对任何损害承担赔偿责任（§15、§16）。",
-                        "10. GPLv3 仅授予著作权与专利层面的许可，不授予本项目名称、图标、商标或品牌的使用权；未经许可不得以本项目名义发布衍生版本或暗示官方背书。",
-                        "11. 违反本许可证的，授权将按 §8 终止；在授权终止后继续复制、分发或修改本程序的，可能构成著作权侵权并承担相应法律责任。"
-                    )
+                    AppStrings.legalLicenseSectionTitle(appLanguage),
+                    if (isZh) AppStrings.legalLicensePointsZh else AppStrings.legalLicensePointsEn
                 )
                 Text(
-                    text = "— 以上为全部条文 —",
+                    text = AppStrings.legalEnd(appLanguage),
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     kind = CouiTextKind.Description,
@@ -588,12 +711,30 @@ class MainActivity : ComponentActivity() {
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "请滑动上方条文到最底部，并原样输入以下文字：",
+                text = AppStrings.legalScrollPrompt(appLanguage),
                 kind = CouiTextKind.Description,
                 color = scheme.onSurface.copy(alpha = 0.75f)
             )
             Spacer(Modifier.height(6.dp))
-            Text(text = legalPhrase, kind = CouiTextKind.Description, color = scheme.accent)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(scheme.accent.copy(alpha = 0.08f))
+                    .clickable { input = legalPhrase }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = legalPhrase, kind = CouiTextKind.Description, color = scheme.accent)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = AppStrings.legalTapToFill(appLanguage),
+                        kind = CouiTextKind.Category,
+                        color = scheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            }
             Spacer(Modifier.height(8.dp))
             BasicTextField(
                 value = input,
@@ -606,7 +747,7 @@ class MainActivity : ComponentActivity() {
                 decorationBox = { inner ->
                     if (input.isEmpty()) {
                         Text(
-                            text = "在此输入确认文字",
+                            text = AppStrings.legalPlaceholder(appLanguage),
                             kind = CouiTextKind.Description,
                             color = scheme.onSurface.copy(alpha = 0.4f)
                         )
@@ -628,7 +769,7 @@ class MainActivity : ComponentActivity() {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "确认并进入",
+                    text = AppStrings.legalConfirmButton(appLanguage),
                     kind = CouiTextKind.SectionTitle,
                     color = if (enabled) Color.White else scheme.onSurface.copy(alpha = 0.5f)
                 )
@@ -636,14 +777,14 @@ class MainActivity : ComponentActivity() {
             if (!readDone) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "请先滑动到条文最底部",
+                    text = AppStrings.legalMustScroll(appLanguage),
                     kind = CouiTextKind.Description,
                     color = scheme.onSurface.copy(alpha = 0.6f)
                 )
             } else if (input.isNotEmpty() && !matched) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "输入内容与要求不一致，请原样输入",
+                    text = AppStrings.legalTextMismatch(appLanguage),
                     kind = CouiTextKind.Description,
                     color = Color(0xFFD32F2F)
                 )
@@ -652,13 +793,93 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun LanguageSelectDialog() {
+        if (!showLanguageDialog) return
+        val scheme = CouiTheme.colorScheme
+        val accent = scheme.accent
+        Dialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = AppStrings.chooseAppLanguage(appLanguage),
+            confirmAction = CouiDialogAction(
+                text = AppStrings.close(appLanguage),
+                onClick = { showLanguageDialog = false }
+            ),
+            visible = true
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = CouiDialogDefaults.contentPadding)
+            ) {
+                for (opt in AppLanguage.entries) {
+                    val isSel = opt == appLanguage
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSel) accent.copy(alpha = 0.12f) else Color.Transparent)
+                            .clickable {
+                                appLanguage = opt
+                                getSharedPreferences("pyb110", MODE_PRIVATE).edit()
+                                    .putString("app_language", opt.code)
+                                    .putBoolean("language_chosen", true)
+                                    .apply()
+                                showLanguageDialog = false
+                            }
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = opt.nativeName,
+                                kind = CouiTextKind.SectionTitle,
+                                color = if (isSel) accent else scheme.onSurface
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = opt.title,
+                                kind = CouiTextKind.Description,
+                                color = scheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                        if (isSel) {
+                            AppIcon(Icons.Filled.Check, null, Modifier.size(22.dp), tint = accent)
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
+    }
+
+    @Composable
     private fun AppRoot() {
-        if (!legalAccepted) {
-            LegalGate(onAccept = {
-                legalAccepted = true
+        if (!languageChosen) {
+            LanguageGate(onAccept = { chosen ->
+                appLanguage = chosen
+                languageChosen = true
                 getSharedPreferences("pyb110", MODE_PRIVATE).edit()
-                    .putBoolean("legal_accepted", true).apply()
+                    .putString("app_language", chosen.code)
+                    .putBoolean("language_chosen", true)
+                    .apply()
             })
+            return
+        }
+        if (!legalAccepted) {
+            LegalGate(
+                onAccept = {
+                    legalAccepted = true
+                    getSharedPreferences("pyb110", MODE_PRIVATE).edit()
+                        .putBoolean("legal_accepted", true).apply()
+                },
+                onToggleLanguage = {
+                    val next = if (appLanguage == AppLanguage.EN) AppLanguage.ZH else AppLanguage.EN
+                    appLanguage = next
+                    getSharedPreferences("pyb110", MODE_PRIVATE).edit()
+                        .putString("app_language", next.code)
+                        .apply()
+                }
+            )
             return
         }
         val dark = CouiTheme.isDark
@@ -678,11 +899,11 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier.fillMaxSize(),
             topBar = {
                 when {
-                    showExtras -> AppTopBar("Extras", onBack = { showExtras = false })
-                    showManual -> AppTopBar("Manual", onBack = { showManual = false })
+                    showExtras -> AppTopBar(AppStrings.titleExtras(appLanguage), onBack = { showExtras = false })
+                    showManual -> AppTopBar(AppStrings.titleManual(appLanguage), onBack = { showManual = false })
                     tab == AppTab.ABOUT && aboutPage == AboutPage.LICENSES ->
-                        AppTopBar("Open Source Licenses", onBack = { aboutPage = AboutPage.HOME })
-                    else -> AppTopBar(if (tab == AppTab.HOME) "Shark" else tab.label)
+                        AppTopBar(AppStrings.titleLicenses(appLanguage), onBack = { aboutPage = AboutPage.HOME })
+                    else -> AppTopBar(if (tab == AppTab.HOME) "Shark" else tab.label(appLanguage))
                 }
             },
             bottomBar = {
@@ -743,6 +964,7 @@ class MainActivity : ComponentActivity() {
         DroidspacesDialog()
         LicenseDetailDialog()
         DonateDialog()
+        LanguageSelectDialog()
     }
 
     @Composable
@@ -797,7 +1019,7 @@ class MainActivity : ComponentActivity() {
             NavigationBar(
                 modifier = Modifier.fillMaxWidth(),
                 renderer = renderer,
-                items = AppTab.entries.map { CouiNavigationItem(it.label, it.icon, it.icon) },
+                items = AppTab.entries.map { CouiNavigationItem(it.label(appLanguage), it.icon, it.icon) },
                 selectedIndex = selected.ordinal,
                 dark = CouiTheme.isDark,
                 onSelection = { onSelect(AppTab.entries[it]) }
@@ -840,7 +1062,7 @@ class MainActivity : ComponentActivity() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     AppIcon(entry.icon, null, Modifier.size(24.dp), tint = tint)
-                    Text(text = entry.label, kind = CouiTextKind.Category, color = tint)
+                    Text(text = entry.label(appLanguage), kind = CouiTextKind.Category, color = tint)
                 }
             }
         }
@@ -1167,14 +1389,15 @@ class MainActivity : ComponentActivity() {
         val uriHandler = LocalUriHandler.current
         val scheme = CouiTheme.colorScheme
         val accent = scheme.accent
+        val isZh = appLanguage == AppLanguage.ZH
         Dialog(
             onDismissRequest = { if (!updateDownloading) updateDialogVisible = false },
-            title = "Update Available ${info.version}",
+            title = "${AppStrings.updateAvailable(appLanguage)} ${info.version}",
             confirmAction = CouiDialogAction(
                 text = when {
-                    updateDownloading -> "Downloading ${(updateProgress * 100).toInt()}%"
-                    pendingApk != null -> "Install"
-                    else -> "Update Now"
+                    updateDownloading -> if (isZh) "下载中 ${(updateProgress * 100).toInt()}%" else "Downloading ${(updateProgress * 100).toInt()}%"
+                    pendingApk != null -> if (isZh) "安装" else "Install"
+                    else -> AppStrings.updateNow(appLanguage)
                 },
                 onClick = {
                     val ready = pendingApk
@@ -1192,13 +1415,13 @@ class MainActivity : ComponentActivity() {
                             result.onSuccess { file ->
                                 if (!UpdateChecker.verifySignature(context, file)) {
                                     file.delete()
-                                    updateError = "APK signature does not match the current app"
+                                    updateError = if (isZh) "APK 签名与当前应用不匹配" else "APK signature does not match the current app"
                                 } else {
                                     pendingApk = file
                                     if (installApk(file)) updateDialogVisible = false
                                 }
                             }.onFailure {
-                                updateError = it.message ?: "Download failed"
+                                updateError = it.message ?: (if (isZh) "下载失败" else "Download failed")
                             }
                         }
                     }
@@ -1208,7 +1431,7 @@ class MainActivity : ComponentActivity() {
                 colors = CouiDialogDefaults.primaryActionColors(accent)
             ),
             dismissAction = CouiDialogAction(
-                text = "Later",
+                text = if (isZh) "稍后" else "Later",
                 onClick = { updateDialogVisible = false },
                 enabled = !updateDownloading
             ),
@@ -1220,7 +1443,7 @@ class MainActivity : ComponentActivity() {
                     .padding(horizontal = CouiDialogDefaults.contentPadding)
             ) {
                 Text(
-                    text = "Current ${BuildConfig.VERSION_NAME}  ·  Source ${info.source}",
+                    text = "${AppStrings.currentVersionLabel(appLanguage)} ${BuildConfig.VERSION_NAME}  ·  Source ${info.source}",
                     kind = CouiTextKind.PreferenceSummary,
                     color = scheme.onSurfaceVariant,
                     textAlign = TextAlign.Start
@@ -1228,7 +1451,7 @@ class MainActivity : ComponentActivity() {
                 if (updateDownloading) {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "Downloading ${(updateProgress * 100).toInt()}%",
+                        text = if (isZh) "下载中 ${(updateProgress * 100).toInt()}%" else "Downloading ${(updateProgress * 100).toInt()}%",
                         kind = CouiTextKind.Body,
                         color = scheme.onSurface,
                         textAlign = TextAlign.Start
@@ -1237,7 +1460,7 @@ class MainActivity : ComponentActivity() {
                     CouiProgressBar(updateProgress)
                 } else {
                     Spacer(Modifier.height(12.dp))
-                    DialogBody(info.changelog.ifBlank { "No release notes" })
+                    DialogBody(info.changelog.ifBlank { if (isZh) "暂无更新日志" else "No release notes" })
                     updateError?.let {
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -1246,7 +1469,7 @@ class MainActivity : ComponentActivity() {
                             color = Color(0xFFD32F2F),
                             textAlign = TextAlign.Start
                         )
-                        DialogLink("Download in Browser") { uriHandler.openUri(info.pageUrl) }
+                        DialogLink(AppStrings.downloadBrowser(appLanguage)) { uriHandler.openUri(info.pageUrl) }
                     }
                 }
             }
@@ -1259,9 +1482,9 @@ class MainActivity : ComponentActivity() {
         val accent = CouiTheme.colorScheme.accent
         Dialog(
             onDismissRequest = { showDonate = false },
-            title = "Support the Developer",
+            title = AppStrings.supportDeveloper(appLanguage),
             confirmAction = CouiDialogAction(
-                text = "Close",
+                text = AppStrings.close(appLanguage),
                 onClick = { showDonate = false },
                 style = CouiDialogActionStyle.Primary,
                 colors = CouiDialogDefaults.primaryActionColors(accent)
@@ -1425,7 +1648,7 @@ class MainActivity : ComponentActivity() {
             item {
                 InfoCard(
                     kernelVersion = kernelVersion,
-                    exploitLabel = exploit.fullLabel,
+                    exploitLabel = if (exploit == ExploitKind.UNSUPPORTED) AppStrings.unsupportedDevice(appLanguage) else exploit.fullLabel,
                     deviceModel = deviceModel,
                     fingerprint = Build.FINGERPRINT,
                     selinux = selinuxText
@@ -1451,15 +1674,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Column {
                         Text(
-                            text = if (granted) "$backendName Authorized" else "$backendName Not Authorized",
+                            text = if (granted) AppStrings.statusAuthorized(backendName, appLanguage)
+                            else AppStrings.statusNotAuthorized(backendName, appLanguage),
                             kind = CouiTextKind.PageTitle,
                             color = colors.title,
                             textAlign = TextAlign.Start
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = if (granted) "Connected to $backendName, ready to root"
-                            else "Not connected to $backendName, please grant permission",
+                            text = if (granted) AppStrings.statusReadyDesc(backendName, appLanguage)
+                            else AppStrings.statusNotReadyDesc(backendName, appLanguage),
                             kind = CouiTextKind.Body,
                             color = colors.title,
                             textAlign = TextAlign.Start
@@ -1485,11 +1709,11 @@ class MainActivity : ComponentActivity() {
     private fun PrimaryActionCard() {
         val colors = CouiPageDefaults.themeColors()
         val label = when {
-            busy -> "Running…"
-            !binderReady -> "Stellar not running (tap to open)"
-            !authorized -> "Authorize Shizuku"
-            ksuActive -> "Verify / Re-root"
-            else -> "One-Click Root"
+            busy -> AppStrings.actionRunning(appLanguage)
+            !binderReady -> AppStrings.actionStellarNotRunning(appLanguage)
+            !authorized -> AppStrings.actionAuthorizeShizuku(appLanguage)
+            ksuActive -> AppStrings.actionReRoot(appLanguage)
+            else -> AppStrings.actionOneClickRoot(appLanguage)
         }
         Group {
             Item(
@@ -1523,7 +1747,7 @@ class MainActivity : ComponentActivity() {
         Group {
             DropdownItem(
                 icon = Icons.Filled.Tag,
-                title = "Root Manager",
+                title = AppStrings.rootManager(appLanguage),
                 values = managerChoices(),
                 selected = manager,
                 label = { it.fullLabel }
@@ -1531,15 +1755,15 @@ class MainActivity : ComponentActivity() {
             Divider(startIndent = itemDividerIndent())
             SettingItem(
                 icon = Icons.Filled.Tune,
-                title = "Extras",
+                title = AppStrings.extras(appLanguage),
                 onClick = { showExtras = true },
                 trailing = { Chevron() }
             )
             Divider(startIndent = itemDividerIndent())
             SettingItem(
                 icon = Icons.Filled.MenuBook,
-                title = "Manual",
-                summary = "Setup, features, and troubleshooting",
+                title = AppStrings.manual(appLanguage),
+                summary = AppStrings.manualSummary(appLanguage),
                 onClick = { showManual = true },
                 trailing = { Chevron() }
             )
@@ -1600,15 +1824,15 @@ class MainActivity : ComponentActivity() {
     ) {
         val colors = CouiPageDefaults.themeColors()
         Group {
-            SettingItem(Icons.Filled.DeveloperBoard, "Kernel Version", summary = kernelVersion)
+            SettingItem(Icons.Filled.DeveloperBoard, AppStrings.kernelVersion(appLanguage), summary = kernelVersion)
             Divider(startIndent = itemDividerIndent(), color = colors.divider)
-            SettingItem(Icons.Filled.BugReport, "Exploit Method", summary = exploitLabel)
+            SettingItem(Icons.Filled.BugReport, AppStrings.exploitMethod(appLanguage), summary = exploitLabel)
             Divider(startIndent = itemDividerIndent(), color = colors.divider)
-            SettingItem(Icons.Filled.Smartphone, "Device Model", summary = deviceModel)
+            SettingItem(Icons.Filled.Smartphone, AppStrings.deviceModel(appLanguage), summary = deviceModel)
             Divider(startIndent = itemDividerIndent(), color = colors.divider)
-            SettingItem(Icons.Filled.Fingerprint, "Build Fingerprint", summary = fingerprint)
+            SettingItem(Icons.Filled.Fingerprint, AppStrings.buildFingerprint(appLanguage), summary = fingerprint)
             Divider(startIndent = itemDividerIndent(), color = colors.divider)
-            SettingItem(Icons.Filled.Security, "SELinux Status", summary = selinux)
+            SettingItem(Icons.Filled.Security, AppStrings.selinuxStatus(appLanguage), summary = selinux)
         }
     }
 
@@ -1643,7 +1867,7 @@ class MainActivity : ComponentActivity() {
                         if (!hidesOplusOnlyOptions()) {
                             SettingSwitchItem(
                                 icon = Icons.Filled.NotificationsOff,
-                                title = "Disable security alerts after root",
+                                title = AppStrings.disableSecurityAlerts(appLanguage),
                                 checked = antiRootGuard,
                                 onCheckedChange = { updateAntiRootGuard(it) }
                             )
@@ -1651,7 +1875,7 @@ class MainActivity : ComponentActivity() {
                         }
                         SettingSwitchItem(
                             icon = Icons.Filled.RestartAlt,
-                            title = "Soft reboot after root",
+                            title = AppStrings.softRebootAfterRoot(appLanguage),
                             checked = softRebootAfter,
                             onCheckedChange = { updateSoftRebootAfter(it) }
                         )
@@ -1659,7 +1883,7 @@ class MainActivity : ComponentActivity() {
                             Divider(startIndent = itemDividerIndent(), color = colors.divider)
                             DropdownItem(
                                 icon = Icons.Filled.Schedule,
-                                title = "软重启时间",
+                                title = AppStrings.softRebootDelay(appLanguage),
                                 values = softRebootDelays,
                                 selected = softRebootDelayMin,
                                 label = { softRebootDelayLabel(it) },
@@ -1670,7 +1894,7 @@ class MainActivity : ComponentActivity() {
                             Divider(startIndent = itemDividerIndent(), color = colors.divider)
                             SettingSwitchItem(
                                 icon = Icons.Filled.RemoveModerator,
-                                title = "Unload kernel security guard",
+                                title = AppStrings.unloadKernelGuard(appLanguage),
                                 checked = unloadGuard,
                                 onCheckedChange = { updateUnloadGuard(it) }
                             )
@@ -1679,7 +1903,7 @@ class MainActivity : ComponentActivity() {
                             Divider(startIndent = itemDividerIndent(), color = colors.divider)
                             SettingSwitchItem(
                                 icon = Icons.Filled.Refresh,
-                                title = "打偏后追页重试",
+                                title = AppStrings.chaseRetry(appLanguage),
                                 checked = chaseRetry,
                                 onCheckedChange = { updateChaseRetry(it) }
                             )
@@ -1687,7 +1911,7 @@ class MainActivity : ComponentActivity() {
                         Divider(startIndent = itemDividerIndent(), color = colors.divider)
                         SettingSwitchItem(
                             icon = Icons.Filled.PowerSettingsNew,
-                            title = "开机自动越狱",
+                            title = AppStrings.autoJailbreak(appLanguage),
                             checked = autoJailbreak,
                             onCheckedChange = { updateAutoJailbreak(it) }
                         )
@@ -1696,7 +1920,7 @@ class MainActivity : ComponentActivity() {
                     if (supportsSusfs()) {
                         SettingSwitchItem(
                             icon = Icons.Filled.Extension,
-                            title = "SUSFS Support",
+                            title = AppStrings.susfsSupport(appLanguage),
                             checked = susfsSupport,
                             onCheckedChange = { updateSusfsSupport(it) }
                         )
@@ -1705,7 +1929,7 @@ class MainActivity : ComponentActivity() {
                         Divider(startIndent = itemDividerIndent(), color = colors.divider)
                         SettingSwitchItem(
                             icon = Icons.Filled.AccountTree,
-                            title = "VFS Support",
+                            title = AppStrings.vfsSupport(appLanguage),
                             checked = vfsSupport,
                             onCheckedChange = { updateVfsSupport(it) }
                         )
@@ -1714,7 +1938,7 @@ class MainActivity : ComponentActivity() {
                         Divider(startIndent = itemDividerIndent(), color = colors.divider)
                         DropdownItem(
                             icon = Icons.Filled.SwapHoriz,
-                            title = "Hot-Switch Manager",
+                            title = AppStrings.hotSwitchManager(appLanguage),
                             values = hotManagerChoices(),
                             selected = hotManager,
                             label = { it.fullLabel }
@@ -1762,9 +1986,10 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ManualScreen(inner: PaddingValues) {
         val context = LocalContext.current
-        val markdown = remember {
+        val markdown = remember(appLanguage) {
+            val assetName = if (appLanguage == AppLanguage.ZH) "manual_zh.md" else "manual.md"
             runCatching {
-                context.assets.open("manual.md").bufferedReader().use { it.readText() }
+                context.assets.open(assetName).bufferedReader().use { it.readText() }
             }.getOrElse { "# Manual\n\nFailed to load manual content." }
         }
         val blocks = remember(markdown) { parseManualMarkdown(markdown) }
@@ -1797,7 +2022,7 @@ class MainActivity : ComponentActivity() {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No logs yet",
+                    text = if (appLanguage == AppLanguage.ZH) "暂无日志" else "No logs yet",
                     kind = CouiTextKind.Body,
                     color = scheme.onSurfaceVariant
                 )
@@ -1841,7 +2066,7 @@ class MainActivity : ComponentActivity() {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No history yet",
+                    text = if (appLanguage == AppLanguage.ZH) "暂无历史记录" else "No history yet",
                     kind = CouiTextKind.Body,
                     color = scheme.onSurfaceVariant
                 )
@@ -2133,12 +2358,13 @@ class MainActivity : ComponentActivity() {
 
     private fun historyValue(e: HistoryEntry): String {
         val dur = e.durationMs?.let { String.format(java.util.Locale.US, "%.1fs", it / 1000.0) }
+        val isZh = appLanguage == AppLanguage.ZH
         return when {
-            e.result == "SUCCESS" && dur != null -> "Success $dur"
-            e.result == "SUCCESS" -> "Success"
-            e.result == "FAIL" && dur != null -> "Failed $dur"
-            e.result == "FAIL" -> "Failed"
-            else -> "Running"
+            e.result == "SUCCESS" && dur != null -> if (isZh) "成功 $dur" else "Success $dur"
+            e.result == "SUCCESS" -> if (isZh) "成功" else "Success"
+            e.result == "FAIL" && dur != null -> if (isZh) "失败 $dur" else "Failed $dur"
+            e.result == "FAIL" -> if (isZh) "失败" else "Failed"
+            else -> if (isZh) "进行中" else "Running"
         }
     }
 
@@ -2225,7 +2451,7 @@ class MainActivity : ComponentActivity() {
                         onClick = { aboutPage = AboutPage.LICENSES }
                     ) {
                         Text(
-                            text = "The app icon was designed for this project; third-party components belong to their respective authors. Full texts are available in Open Source Licenses.",
+                            text = AppStrings.aboutIconNotice(appLanguage),
                             kind = CouiTextKind.PreferenceSummary,
                             color = colors.title,
                             textAlign = TextAlign.Start
@@ -2236,49 +2462,57 @@ class MainActivity : ComponentActivity() {
             item {
                 Group {
                     SettingItem(
+                        icon = Icons.Filled.Language,
+                        title = AppStrings.appLanguage(appLanguage),
+                        summary = appLanguage.nativeName,
+                        onClick = { showLanguageDialog = true },
+                        trailing = { Chevron() }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
                         icon = Icons.Filled.Code,
-                        title = "Source Code",
-                        summary = "View source code on GitHub",
+                        title = AppStrings.sourceCode(appLanguage),
+                        summary = AppStrings.sourceCodeSummary(appLanguage),
                         onClick = { uriHandler.openUri(PROJECT_URL) },
                         trailing = { Chevron() }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     SettingItem(
                         icon = Icons.Filled.Forum,
-                        title = "Community",
-                        summary = "Join QQ Group",
+                        title = AppStrings.community(appLanguage),
+                        summary = AppStrings.communitySummary(appLanguage),
                         onClick = { uriHandler.openUri("https://qun.qq.com/universal-share/share?ac=1&authKey=eE6%2FYVLY%2BFHI2Jp1Zl41xbKG8RF68rLFFsYyiVEX8jXZ8q1vUt%2Fx8qRNuVwXUX%2BN&busi_data=eyJncm91cENvZGUiOiIzMzIxNTgyNzMiLCJ0b2tlbiI6InF0dElWSE1oaFdIRVQzc3dEM2dkVEplR1FMKzdsQWI5Zm83cnBKVVdpdEtpZ2IyVDRHVzdFU3RtL2JpczdtdUUiLCJ1aW4iOiIzMzQ0ODI1NTI5In0%3D&data=Sk6L8EVerfFbnZ9vvaFh8A7VLTyPXMxQLGi5k745ItjvgiYSuIltQO8nDA6llZ0Y6MKw25z0LT3uMNGui0QJjQ&svctype=4&tempid=h5_group_info") },
                         trailing = { Chevron() }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     SettingItem(
                         icon = Icons.Filled.BugReport,
-                        title = "Report Issues",
-                        summary = "Submit issues on GitHub Issues",
+                        title = AppStrings.reportIssues(appLanguage),
+                        summary = AppStrings.reportIssuesSummary(appLanguage),
                         onClick = { uriHandler.openUri("$PROJECT_URL/issues") },
                         trailing = { Chevron() }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     SettingItem(
                         icon = Icons.Filled.Refresh,
-                        title = "Check for Updates",
-                        summary = "Current v${BuildConfig.VERSION_NAME}",
+                        title = AppStrings.checkForUpdates(appLanguage),
+                        summary = "${AppStrings.currentVersionPrefix(appLanguage)}${BuildConfig.VERSION_NAME}",
                         onClick = { checkForUpdatesManually() },
                         trailing = { Chevron() }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     SettingItem(
                         icon = Icons.Filled.Favorite,
-                        title = "Support the Developer",
-                        summary = "WeChat / Alipay donation QR codes",
+                        title = AppStrings.supportDeveloper(appLanguage),
+                        summary = AppStrings.supportDeveloperSummary(appLanguage),
                         onClick = { showDonate = true },
                         trailing = { Chevron() }
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     SettingItem(
                         icon = Icons.Filled.Copyright,
-                        title = "Open Source Licenses",
-                        summary = "View third-party open source libraries and license details",
+                        title = AppStrings.openSourceLicenses(appLanguage),
+                        summary = AppStrings.openSourceLicensesSummary(appLanguage),
                         onClick = { aboutPage = AboutPage.LICENSES },
                         trailing = { Chevron() }
                     )
@@ -2321,15 +2555,12 @@ class MainActivity : ComponentActivity() {
                 bottom = inner.calculateBottomPadding() + 12.dp
             )
         ) {
-            item { SectionLabel("Project & Bundled Components") }
+            item { SectionLabel(AppStrings.projectAndBundled(appLanguage)) }
             items(localItems) { item ->
                 LicenseCard(item) { aboutLicense = item }
             }
             item {
-                SectionLabel(
-                    if (libraryItems.isEmpty()) "Third-Party Dependencies"
-                    else "Third-Party Dependencies (${libraryItems.size})"
-                )
+                SectionLabel(AppStrings.thirdPartyDeps(libraryItems.size, appLanguage))
             }
             items(libraryItems) { item ->
                 LicenseCard(item) { aboutLicense = item }
@@ -2841,11 +3072,18 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private enum class AppTab(val label: String, val icon: ImageVector) {
-        HOME("Home", Icons.Filled.Home),
-        LOGS("Logs", Icons.Filled.Notes),
-        HISTORY("History", Icons.Filled.History),
-        ABOUT("About", Icons.Filled.Info)
+    private enum class AppTab(val icon: ImageVector) {
+        HOME(Icons.Filled.Home),
+        LOGS(Icons.Filled.Notes),
+        HISTORY(Icons.Filled.History),
+        ABOUT(Icons.Filled.Info);
+
+        fun label(lang: AppLanguage): String = when (this) {
+            HOME -> AppStrings.tabHome(lang)
+            LOGS -> AppStrings.tabLogs(lang)
+            HISTORY -> AppStrings.tabHistory(lang)
+            ABOUT -> AppStrings.tabAbout(lang)
+        }
     }
 
     private enum class ExploitKind(val fullLabel: String) {
