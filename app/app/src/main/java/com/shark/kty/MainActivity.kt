@@ -2,6 +2,8 @@ package com.shark.kty
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -72,7 +74,9 @@ import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Copyright
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DeveloperBoard
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Favorite
@@ -90,6 +94,7 @@ import androidx.compose.material.icons.filled.RemoveModerator
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
@@ -2013,6 +2018,24 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
+                        icon = Icons.Filled.Share,
+                        title = AppStrings.exportKernelInfo(appLanguage),
+                        onClick = {
+                            val info = """
+                                Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})
+                                Fingerprint: ${Build.FINGERPRINT}
+                                Kernel: $kernelVersion
+                                SELinux: $selinuxText
+                                Manager: ${manager.displayLabel(appLanguage)}
+                                Shark: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})
+                            """.trimIndent()
+                            val cm = getSystemService(ClipboardManager::class.java)
+                            cm?.setPrimaryClip(ClipData.newPlainText("Shark Kernel Info", info))
+                            Toast.makeText(this@MainActivity, AppStrings.kernelInfoCopied(appLanguage), Toast.LENGTH_SHORT).show()
+                        }
+                    )
                 }
             }
             item {
@@ -2078,44 +2101,186 @@ class MainActivity : ComponentActivity() {
 
     /* ===== Logs ===== */
 
-    @Composable
+@Composable
     private fun LogScreen(inner: PaddingValues) {
         val scheme = CouiTheme.colorScheme
+        val context = LocalContext.current
         val state = logs.toList()
-        if (state.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (appLanguage == AppLanguage.ZH) "暂无日志" else "No logs yet",
-                    kind = CouiTextKind.Body,
-                    color = scheme.onSurfaceVariant
-                )
+        var filterIndex by remember { mutableStateOf(0) }
+
+        val filteredLogs = remember(state, filterIndex) {
+            when (filterIndex) {
+                1 -> state.filter { line ->
+                    line.contains("FAIL", ignoreCase = true) || line.contains("error", ignoreCase = true) ||
+                        line.contains("mismatch", ignoreCase = true) || line.contains("exit=", ignoreCase = true)
+                }
+                2 -> state.filter { line ->
+                    line.contains("PROBE", ignoreCase = true) || line.contains("PLANT", ignoreCase = true) ||
+                        line.contains("EXPLOIT", ignoreCase = true)
+                }
+                3 -> state.filter { line ->
+                    line.contains("KernelSU", ignoreCase = true) || line.contains("ksud", ignoreCase = true)
+                }
+                else -> state
             }
-            return
         }
-        val listState = rememberLazyListState()
-        LaunchedEffect(state.size) {
-            listState.scrollToItem(state.lastIndex)
-        }
-        val logStyle = rememberCouiTextStyle(CouiTextKind.Description).copy(
-            fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            color = scheme.onSurface
-        )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = inner.calculateTopPadding() + 8.dp,
-                bottom = inner.calculateBottomPadding() + 12.dp,
-                start = 16.dp,
-                end = 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = inner.calculateTopPadding() + 4.dp,
+                    bottom = inner.calculateBottomPadding() + 8.dp
+                )
         ) {
-            items(state) { line -> BasicText(text = line, style = logStyle) }
+            // Action Bar: Copy All, Share, Clear
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Copy Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(scheme.surface)
+                        .clickable(enabled = state.isNotEmpty()) {
+                            val cm = context.getSystemService(ClipboardManager::class.java)
+                            cm?.setPrimaryClip(ClipData.newPlainText("Shark Logs", state.joinToString("\n")))
+                            Toast.makeText(context, AppStrings.logsCopied(appLanguage), Toast.LENGTH_SHORT).show()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppIcon(Icons.Filled.ContentCopy, null, Modifier.size(14.dp), tint = scheme.accent)
+                        Spacer(Modifier.width(4.dp))
+                        Text(text = AppStrings.copyLogs(appLanguage), kind = CouiTextKind.Category, color = scheme.accent)
+                    }
+                }
+
+                // Share Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(scheme.surface)
+                        .clickable(enabled = state.isNotEmpty()) {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, state.joinToString("\n"))
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, AppStrings.shareLogs(appLanguage)))
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppIcon(Icons.Filled.Share, null, Modifier.size(14.dp), tint = scheme.accent)
+                        Spacer(Modifier.width(4.dp))
+                        Text(text = AppStrings.shareLogs(appLanguage), kind = CouiTextKind.Category, color = scheme.accent)
+                    }
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                // Clear Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(scheme.surface)
+                        .clickable(enabled = state.isNotEmpty()) {
+                            logs.clear()
+                            Toast.makeText(context, AppStrings.logsCleared(appLanguage), Toast.LENGTH_SHORT).show()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppIcon(Icons.Filled.DeleteOutline, null, Modifier.size(14.dp), tint = Color(0xFFE57373))
+                        Spacer(Modifier.width(4.dp))
+                        Text(text = AppStrings.clearLogs(appLanguage), kind = CouiTextKind.Category, color = Color(0xFFE57373))
+                    }
+                }
+            }
+
+            // Filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val chips = listOf(
+                    AppStrings.filterAll(appLanguage),
+                    AppStrings.filterErrors(appLanguage),
+                    AppStrings.filterProbe(appLanguage),
+                    AppStrings.filterKsu(appLanguage)
+                )
+                chips.forEachIndexed { idx, label ->
+                    val isSel = filterIndex == idx
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSel) scheme.accent else scheme.surface)
+                            .clickable { filterIndex = idx }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            kind = CouiTextKind.Category,
+                            color = if (isSel) Color.White else scheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (filteredLogs.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = AppStrings.noLogs(appLanguage),
+                        kind = CouiTextKind.Body,
+                        color = scheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                val listState = rememberLazyListState()
+                LaunchedEffect(filteredLogs.size) {
+                    if (filteredLogs.isNotEmpty()) {
+                        listState.scrollToItem(filteredLogs.lastIndex)
+                    }
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(filteredLogs) { line ->
+                        val lineColor = when {
+                            line.contains("FAIL", ignoreCase = true) || line.contains("error", ignoreCase = true) || line.contains("mismatch", ignoreCase = true) -> Color(0xFFFF5252)
+                            line.contains("SUCCESS", ignoreCase = true) || line.contains("ok", ignoreCase = true) || line.contains("hit", ignoreCase = true) || line.contains("RESULT=OK") -> Color(0xFF66BB6A)
+                            line.contains("PROBE", ignoreCase = true) || line.contains("PLANT", ignoreCase = true) || line.contains("EXPLOIT", ignoreCase = true) -> Color(0xFF26C6DA)
+                            line.contains("START", ignoreCase = true) || line.contains("BOOT_REASON") -> Color(0xFFFFB74D)
+                            else -> scheme.onSurface
+                        }
+                        BasicText(
+                            text = line,
+                            style = rememberCouiTextStyle(CouiTextKind.Description).copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = lineColor
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 
