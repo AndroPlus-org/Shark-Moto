@@ -230,7 +230,8 @@ object JailbreakCore {
         val vfsSupport: Boolean,
         val universal: Boolean,
         val chaseRetry: Boolean,
-        val customManagerPkg: String? = null
+        val customManagerPkg: String? = null,
+        val safeModeModules: Boolean = false
     )
 
     fun buildEnv(context: Context, cfg: EnvConfig, dir: String): Array<String> {
@@ -258,8 +259,28 @@ object JailbreakCore {
             "PYB110_UNIVERSAL_KSUD=$nativeDir/libksud_universal.so",
             "PYB110_FILES_DIR=${context.filesDir.absolutePath}",
             "PYB110_SUSFS_KO=$nativeDir/$susfsKo",
-            "PYB110_VFS_KO=$nativeDir/libhybridmount.so"
+            "PYB110_VFS_KO=$nativeDir/libhybridmount.so",
+            "PYB110_SAFE_MODE=${if (cfg.safeModeModules) "1" else "0"}"
         )
+    }
+
+    fun setKernelSuSafeMode(enabled: Boolean, runShell: (String) -> Pair<Int, String>): Pair<Int, String> {
+        val cmd = if (enabled) {
+            "mkdir -p /data/adb/ksu && touch /data/adb/ksu/disable"
+        } else {
+            "rm -f /data/adb/ksu/disable"
+        }
+        return runShell(cmd)
+    }
+
+    fun setSELinuxMode(enforce: Boolean, runShell: (String) -> Pair<Int, String>): Pair<Int, String> {
+        val cmd = if (enforce) "setenforce 1" else "setenforce 0"
+        return runShell(cmd)
+    }
+
+    fun getSELinuxMode(runShell: (String) -> Pair<Int, String>): String {
+        val (rc, out) = runShell("getenforce")
+        return if (rc == 0) out.trim() else "Unknown"
     }
 
     fun runStreaming(

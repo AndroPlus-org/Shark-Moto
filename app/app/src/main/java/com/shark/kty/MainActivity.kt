@@ -77,6 +77,7 @@ import androidx.compose.material.icons.filled.DeveloperBoard
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -294,6 +295,8 @@ class MainActivity : ComponentActivity() {
     private var languageChosen by mutableStateOf(false)
     private var appLanguage by mutableStateOf(AppLanguage.EN)
     private var showLanguageDialog by mutableStateOf(false)
+    private var safeModeModules by mutableStateOf(false)
+    private var selinuxPermissive by mutableStateOf(false)
     private var historyEntries by mutableStateOf(listOf<HistoryEntry>())
     private var historyDetail by mutableStateOf<HistoryEntry?>(null)
     private var historyDetailText by mutableStateOf("")
@@ -476,6 +479,7 @@ class MainActivity : ComponentActivity() {
             else -> AppLanguage.EN
         }
         languageChosen = prefs.getBoolean("language_chosen", legalAccepted)
+        safeModeModules = prefs.getBoolean("safe_mode_modules", false)
         val savedManager = prefs.getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
         kernelVersion = runCatching { android.system.Os.uname().release }.getOrDefault("Unknown")
@@ -1161,11 +1165,13 @@ class MainActivity : ComponentActivity() {
         icon: ImageVector,
         title: String,
         checked: Boolean,
+        summary: String? = null,
         onCheckedChange: (Boolean) -> Unit
     ) {
         SettingItem(
             icon = icon,
             title = title,
+            summary = summary,
             onClick = { onCheckedChange(!checked) },
             trailing = {
                 Switch(
@@ -1970,6 +1976,40 @@ class MainActivity : ComponentActivity() {
                                 Toast.makeText(this@MainActivity, AppStrings.spoofedManagerDetected(found, appLanguage), Toast.LENGTH_SHORT).show()
                             } else {
                                 Toast.makeText(this@MainActivity, AppStrings.spoofedManagerNotFound(appLanguage), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingSwitchItem(
+                        icon = Icons.Filled.HealthAndSafety,
+                        title = AppStrings.safeModeModules(appLanguage),
+                        summary = AppStrings.safeModeSummary(appLanguage),
+                        checked = safeModeModules,
+                        onCheckedChange = { checked ->
+                            safeModeModules = checked
+                            getSharedPreferences("pyb110", MODE_PRIVATE).edit().putBoolean("safe_mode_modules", checked).apply()
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                JailbreakCore.setKernelSuSafeMode(checked) { cmd -> runRootCommand(cmd, 5) }
+                            }
+                        }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingSwitchItem(
+                        icon = Icons.Filled.Security,
+                        title = AppStrings.selinuxMode(appLanguage),
+                        summary = if (selinuxPermissive) "Permissive" else "Enforcing",
+                        checked = selinuxPermissive,
+                        onCheckedChange = { checked ->
+                            lifecycleScope.launch {
+                                val (rc, _) = withContext(Dispatchers.IO) {
+                                    JailbreakCore.setSELinuxMode(!checked) { cmd -> runRootCommand(cmd, 5) }
+                                }
+                                if (rc == 0) {
+                                    selinuxPermissive = checked
+                                    selinuxText = if (checked) "Permissive" else "Enforcing"
+                                    val modeName = if (checked) "Permissive" else "Enforcing"
+                                    Toast.makeText(this@MainActivity, AppStrings.selinuxSwitched(modeName, appLanguage), Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     )
@@ -2912,7 +2952,10 @@ class MainActivity : ComponentActivity() {
     private fun refreshStaticStateAsync() {
         lifecycleScope.launch(Dispatchers.IO) {
             val raw = getSELinuxStatusRaw()
-            withContext(Dispatchers.Main) { selinuxText = mapSelinux(raw) }
+            withContext(Dispatchers.Main) {
+                selinuxText = mapSelinux(raw)
+                selinuxPermissive = selinuxText.equals("Permissive", ignoreCase = true)
+            }
         }
     }
 
@@ -3094,7 +3137,8 @@ class MainActivity : ComponentActivity() {
             vfsSupport = vfsSupport,
             universal = dynamicSwitching && supportsUniversal(),
             chaseRetry = chaseRetry,
-            customManagerPkg = targetPkg
+            customManagerPkg = targetPkg,
+            safeModeModules = safeModeModules
         )
         val env = JailbreakCore.buildEnv(applicationContext, cfg, dir)
         return JailbreakCore.runStreaming(cmd, env, dir) { addLog(it) }
