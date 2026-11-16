@@ -107,20 +107,18 @@ class AutoJailbreakService : Service() {
 
         val managerKind = prefs.getString("manager", "KERNELSU") ?: "KERNELSU"
         var managerPkg = JailbreakCore.managerRuntime(managerKind).second
-        if (managerKind == "NEXT") {
-            val hasNext = runCatching { packageManager.getPackageInfo(managerPkg, 0) }.isSuccess
-            if (!hasNext) {
-                val hasSpoofed = runCatching { packageManager.getPackageInfo("kqvdie.zeykvw.hpbcyd", 0) }.isSuccess
-                if (hasSpoofed) {
-                    managerPkg = "kqvdie.zeykvw.hpbcyd"
+        if (managerKind == "NEXT" || managerKind == "NEXT_SPOOFED") {
+            val savedSpoofed = prefs.getString("custom_spoofed_pkg", null)?.trim()
+            if (!savedSpoofed.isNullOrEmpty() && runCatching { packageManager.getPackageInfo(savedSpoofed, 0) }.isSuccess) {
+                managerPkg = savedSpoofed
+            } else {
+                val detected = JailbreakCore.findSpoofedNextPackage(this) { cmd ->
+                    val p = PrivService.newProcess(arrayOf("sh", "-c", cmd), arrayOf("PATH=/system/bin:/system/xbin"), "/")
+                    val out = p.getInputStream().bufferedReader().use { it.readText() }
+                    p.waitFor() to out
                 }
-            }
-        } else if (managerKind == "NEXT_SPOOFED") {
-            val hasSpoofed = runCatching { packageManager.getPackageInfo(managerPkg, 0) }.isSuccess
-            if (!hasSpoofed) {
-                val hasNext = runCatching { packageManager.getPackageInfo("com.rifsxd.ksunext", 0) }.isSuccess
-                if (hasNext) {
-                    managerPkg = "com.rifsxd.ksunext"
+                if (!detected.isNullOrEmpty()) {
+                    managerPkg = detected
                 }
             }
         }

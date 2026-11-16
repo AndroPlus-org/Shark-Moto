@@ -19,6 +19,11 @@
         <package android:name="kqvdie.zeykvw.hpbcyd" />
         <package android:name="com.resukisu.resukisu" />
         <package android:name="com.sukisu.ultra" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:mimeType="application/zip" android:scheme="content" />
+        </intent>
     </queries>
 
     <application

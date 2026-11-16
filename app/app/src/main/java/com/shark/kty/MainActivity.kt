@@ -284,6 +284,7 @@ class MainActivity : ComponentActivity() {
     private var dynamicSwitching by mutableStateOf(false)
     private var universalLoaded by mutableStateOf(false)
     private var hotManager by mutableStateOf(ManagerKind.KERNELSU)
+    private var customSpoofedPkg by mutableStateOf("")
     private var hotSwitchBusy by mutableStateOf(false)
     private var hotSwitchError by mutableStateOf<String?>(null)
     private var tab by mutableStateOf(AppTab.HOME)
@@ -484,6 +485,7 @@ class MainActivity : ComponentActivity() {
         }
         dynamicSwitching = manager == ManagerKind.DYNAMIC
         hotManager = if (dynamicSwitching) ManagerKind.KERNELSU else manager
+        customSpoofedPkg = prefs.getString("custom_spoofed_pkg", "") ?: ""
         deviceModel = resolveDeviceName()
         refreshStaticStateAsync()
         refreshKsuAsync()
@@ -1947,6 +1949,23 @@ class MainActivity : ComponentActivity() {
                             switchHotManager(target)
                         }
                     }
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
+                        icon = Icons.Filled.Security,
+                        title = AppStrings.spoofedManager(appLanguage),
+                        summary = if (customSpoofedPkg.isNotBlank()) customSpoofedPkg else AppStrings.spoofedManagerScan(appLanguage),
+                        onClick = {
+                            val found = JailbreakCore.findSpoofedNextPackage(this@MainActivity) { cmd -> runRootCommand(cmd, 5) }
+                            if (!found.isNullOrEmpty()) {
+                                customSpoofedPkg = found
+                                getSharedPreferences("pyb110", MODE_PRIVATE).edit().putString("custom_spoofed_pkg", found).apply()
+                                addLog(AppStrings.spoofedManagerDetected(found, appLanguage))
+                                Toast.makeText(this@MainActivity, AppStrings.spoofedManagerDetected(found, appLanguage), Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this@MainActivity, AppStrings.spoofedManagerNotFound(appLanguage), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
                 }
             }
             item {
@@ -3132,12 +3151,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun resolveInstalledManagerPkg(kind: ManagerKind): String {
-        if (isPackageInstalled(kind.pkg)) return kind.pkg
-        if (kind == ManagerKind.NEXT && isPackageInstalled(ManagerKind.NEXT_SPOOFED.pkg)) {
-            return ManagerKind.NEXT_SPOOFED.pkg
-        }
-        if (kind == ManagerKind.NEXT_SPOOFED && isPackageInstalled(ManagerKind.NEXT.pkg)) {
-            return ManagerKind.NEXT.pkg
+        if (kind == ManagerKind.NEXT || kind == ManagerKind.NEXT_SPOOFED) {
+            if (customSpoofedPkg.isNotBlank() && isPackageInstalled(customSpoofedPkg)) {
+                return customSpoofedPkg
+            }
+            if (isPackageInstalled(kind.pkg)) return kind.pkg
+            val other = if (kind == ManagerKind.NEXT) ManagerKind.NEXT_SPOOFED.pkg else ManagerKind.NEXT.pkg
+            if (isPackageInstalled(other)) return other
+
+            val detected = JailbreakCore.findSpoofedNextPackage(this) { cmd -> runRootCommand(cmd, 5) }
+            if (!detected.isNullOrEmpty()) {
+                customSpoofedPkg = detected
+                getSharedPreferences("pyb110", MODE_PRIVATE).edit().putString("custom_spoofed_pkg", detected).apply()
+                return detected
+            }
+            return kind.pkg
         }
         return kind.pkg
     }

@@ -196,6 +196,12 @@ object AppStrings {
     fun susfsSupport(lang: AppLanguage): String = if (lang == AppLanguage.ZH) "SUSFS 隐藏支持" else "SUSFS Support"
     fun vfsSupport(lang: AppLanguage): String = if (lang == AppLanguage.ZH) "VFS 虚拟文件系统" else "VFS Support"
     fun hotSwitchManager(lang: AppLanguage): String = if (lang == AppLanguage.ZH) "热切换 Root 管理器" else "Hot-Switch Manager"
+    fun spoofedManager(lang: AppLanguage): String = if (lang == AppLanguage.ZH) "伪装版管理器包名" else "Spoofed Manager Package"
+    fun spoofedManagerScan(lang: AppLanguage): String = if (lang == AppLanguage.ZH) "扫描并自动检测" else "Scan & Auto-Detect"
+    fun spoofedManagerDetected(pkg: String, lang: AppLanguage): String =
+        if (lang == AppLanguage.ZH) "已检测到伪装管理器：$pkg" else "Detected spoofed manager: $pkg"
+    fun spoofedManagerNotFound(lang: AppLanguage): String =
+        if (lang == AppLanguage.ZH) "未检测到已安装的伪装版管理器" else "No spoofed manager detected"
 
     // Update Dialog
     fun updateAvailable(lang: AppLanguage): String = if (lang == AppLanguage.ZH) "发现新版本" else "Update Available"

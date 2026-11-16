@@ -1,6 +1,9 @@
 package com.shark.kty
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -128,6 +131,66 @@ object JailbreakCore {
         "SUKISU" -> "SukiSU Ultra"
         "DYNAMIC" -> "Dynamic Switching"
         else -> "KernelSU"
+    }
+
+    /**
+     * Attempts to dynamically discover an installed KernelSU / KernelSU-Next package
+     * (including randomized/spoofed packages).
+     */
+    fun findSpoofedNextPackage(
+        context: Context,
+        runShellCmd: ((String) -> Pair<Int, String>)? = null
+    ): String? {
+        val pm = context.packageManager
+
+        // 1. Check known default package names first
+        for (pkg in listOf("com.rifsxd.ksunext", "kqvdie.zeykvw.hpbcyd")) {
+            if (runCatching { pm.getPackageInfo(pkg, 0) }.isSuccess) {
+                return pkg
+            }
+        }
+
+        // 2. Query via Intent for apps registering FlashModule (.zip viewer)
+        runCatching {
+            val zipIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.parse("content://dummy/module.zip"), "application/zip")
+                addCategory(Intent.CATEGORY_DEFAULT)
+            }
+            val matches = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.queryIntentActivities(zipIntent, PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.queryIntentActivities(zipIntent, 0)
+            }
+            for (resolve in matches) {
+                val pkg = resolve.activityInfo?.packageName ?: continue
+                if (pkg == context.packageName) continue
+                val label = runCatching { resolve.loadLabel(pm).toString() }.getOrDefault("")
+                val act = resolve.activityInfo?.name.orEmpty()
+                if (label.contains("KernelSU", ignoreCase = true) ||
+                    act.endsWith(".FlashModule") ||
+                    act.contains(".ui.MainActivity")
+                ) {
+                    return pkg
+                }
+            }
+        }
+
+        // 3. Fallback: Privileged shell scan for libksud.so among third-party packages
+        if (runShellCmd != null) {
+            runCatching {
+                val script = "for p in \$(pm list packages -3 2>/dev/null | cut -d: -f2); do " +
+                    "dir=\$(pm path \"\$p\" 2>/dev/null | head -n1 | sed -e 's/^package://' -e 's|/[^/]*$||'); " +
+                    "if [ -f \"\$dir/lib/arm64/libksud.so\" ]; then echo \"\$p\"; break; fi; done"
+                val (rc, out) = runShellCmd(script)
+                val detected = out.lines().firstOrNull { it.isNotBlank() && !it.contains(" ") }?.trim()
+                if (rc == 0 && !detected.isNullOrEmpty()) {
+                    return detected
+                }
+            }
+        }
+
+        return null
     }
 
     fun resolveDeviceName(): String {
