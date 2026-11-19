@@ -1,5 +1,21 @@
 {
   "version": 1,
   "updated_at": "2026-11-20T00:00:00Z",
-  "profiles": []
+  "profiles": [
+    {
+      "release": "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k",
+      "model": "Xiaomi POCO M7 Pro (beryl)",
+      "engine": "CVE61230",
+      "timer_site": "0xffffffc0801e1a14",
+      "timer_low21": "0x1e1a14",
+      "copy_low21": "0x0d1598",
+      "selinux_state": "0xffffffc0823ddf80",
+      "panic_on_warn": "0xffffffc082186c38",
+      "root_user": "0xffffffc0821ab130",
+      "init_user_ns": "0xffffffc0821aaeb0",
+      "init_ucounts": "0xffffffc0821accb0",
+      "init_groups": "0xffffffc0821ac740",
+      "site_mask": "0xffff"
+    }
+  ]
 }

@@ -32,6 +32,7 @@ object JailbreakCore {
         "6.12.69-android16-6-g5fd39602326e-ab16372235-4k" to "CVE61269",
         "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k" to "CVE61269",
         "6.12.38-android16-5-g844001fb8721-ab14552068-4k" to "CVE61238",
+        "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k" to "CVE61230",
         "6.12.58-android16-6-g7704a1ae279b-ab15213644-4k" to "CVE61258",
         "6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k" to "CVE61258",
         "6.12.58-android16-6-g09eda8c8505a-ab15950084-4k" to "CVE61258",
@@ -79,6 +80,7 @@ object JailbreakCore {
         } else "$nativeDir/libk61821.so"
         "CVE61269" -> "$nativeDir/libk61269.so"
         "CVE61238" -> "$nativeDir/libk61238.so"
+        "CVE61230" -> "$nativeDir/libk61230.so"
         "CVE61258" -> if (BuildConfig.VIVO_IQOO_SUPPORT) "$nativeDir/libk61258.so"
         else "$nativeDir/libk61258x.so"
         "CVE61223" -> "$nativeDir/libk61223.so"
@@ -97,7 +99,7 @@ object JailbreakCore {
         !gate && kind != "CVE66118" && kind != "CVE66127" && kind != "UNSUPPORTED"
 
     fun supportsUniversal(kind: String): Boolean =
-        kind == "CVE61821" || kind == "CVE61269" || kind == "CVE61238" ||
+        kind == "CVE61821" || kind == "CVE61269" || kind == "CVE61238" || kind == "CVE61230" ||
             kind == "CVE61258" || kind == "CVE61223"
 
     fun supportsChaseRetry(kind: String, release: String): Boolean =
