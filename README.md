@@ -65,6 +65,7 @@ Shark supports OnePlus, OPPO, Realme, iQOO, and Motorola devices without requiri
 | iQOO Pad Pro 8.8" | OriginOS 7 | `6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k` |
 | iQOO Pad6 Pro | OriginOS 7 | `6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k` |
 | Motorola Signature | Android 17 | `6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k`<br>`6.12.58-android16-6-g09eda8c8505a-ab15950084-4k` |
+| Motorola Edge 70 Pro | Android 16 | `6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k` |
 
 ## Supported Managers
 
@@ -74,7 +75,7 @@ Manager APKs are **not** bundled with Shark. Standard mode runs `ksud` directly 
 
 ## Features
 
-- **One-Click Temporary Root**: No manual exploit selection is needed — the app automatically matches one of six chains (`6.18.21` / `6.12.69` / `6.12.38` / `6.12.58` / `6.12.23` / `6.6.118`) by `uname -r`. Tap **One-Click Root** once to complete privilege escalation, `ksud late-load`, module installation, and manager launch. Temporary root disappears on reboot; simply run it again after the next boot.
+- **One-Click Temporary Root**: No manual exploit selection is needed — the app automatically matches one of seven chains (`6.18.21` / `6.12.69` / `6.12.38` / `6.12.58` / `6.12.23` / `6.6.118` / `6.6.89`) by `uname -r`. Tap **One-Click Root** once to complete privilege escalation, `ksud late-load`, module installation, and manager launch. Temporary root disappears on reboot; simply run it again after the next boot.
 - **Five Root Managers**: Choose KernelSU, KernelSU-Next, BakaSU, SukiSU Ultra, or FinaSU directly from the Root Manager dropdown. The app is not locked to any single manager; install your preferred manager APK beforehand and Standard mode will execute its own `ksud` and LKM.
 - **Hot-Switch Root Managers**: Supported on `6.18` and `6.12`. On a clean boot, select `Dynamic Switching` to load the universal KSU LKM (initialized as KernelSU), then select your target manager in **Extras → Hot-Switch Manager**. Switching updates the version code, features, private ioctl, and primary manager profile, then automatically relaunches the target manager without rebooting or re-exploiting.
 - **Extras**: Load VFS provider on `6.18`; load SUSFS on `6.12` / V2505A; plus toggles for anti-root popup suppression, post-root soft reboot, and unloading kernel security guards (OPPO/ColorOS-specific guards are skipped automatically on V2505A and Motorola). Enable as needed — a failure in an optional toggle does not affect the already completed root session.

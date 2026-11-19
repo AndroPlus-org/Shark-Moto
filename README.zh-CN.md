@@ -68,6 +68,7 @@ SukiSU Ultra 或 FinaSU 的 root 环境。
 | iQOO Pad Pro 8.8 英寸 | OriginOS 7 | `6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k` |
 | iQOO Pad6 Pro | OriginOS 7 | `6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k` |
 | Motorola Signature | Android 17 | `6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k`<br>`6.12.58-android16-6-g09eda8c8505a-ab15950084-4k` |
+| Motorola Edge 70 Pro | Android 16 | `6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k` |
 
 ## 支持的管理器
 
@@ -79,7 +80,7 @@ KernelSU、KernelSU-Next、BakaSU、SukiSU Ultra、FinaSU 五家。
 ## 能做什么
 
 - **一键临时 Root**：打开 App 后不需要手动选漏洞，它会根据 `uname -r`
-  自动匹配 6.18.21 / 6.12.69 / 6.12.38 / 6.12.58 / 6.12.23 / 6.6.118 六条链。点一次「一键越狱」即可完成提权、
+  自动匹配 6.18.21 / 6.12.69 / 6.12.38 / 6.12.58 / 6.12.23 / 6.6.118 / 6.6.89 七条链。点一次「一键越狱」即可完成提权、
   `ksud late-load`、模块安装和管理器拉起；临时 Root 在重启后消失，下次
   开机重新执行即可。
 - **五家管理器可选**：ROOT 管理器下拉直接选择 KernelSU、KernelSU-Next、

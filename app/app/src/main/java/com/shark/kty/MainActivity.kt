@@ -2334,7 +2334,10 @@ class MainActivity : ComponentActivity() {
                 fi
                 echo ""
                 echo "=== READ-ONLY PROBE TEST ==="
-                if [ -x "$nativeDir/libk61230.so" ] && echo "$kernelVersion" | grep -q "6.12.30"; then
+                if [ -x "$nativeDir/libk6689.so" ] && echo "$kernelVersion" | grep -q "6.6.89"; then
+                    echo "Executing libk6689.so probe:"
+                    "$nativeDir/libk6689.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61230.so" ] && echo "$kernelVersion" | grep -q "6.12.30"; then
                     echo "Executing libk61230.so probe:"
                     "$nativeDir/libk61230.so" probe 2>&1
                 elif [ -x "$nativeDir/libk66118.so" ] && echo "$kernelVersion" | grep -q "6.6.118"; then
@@ -3711,6 +3714,7 @@ class MainActivity : ComponentActivity() {
                     ExploitKind.CVE61223 -> arrayOf("$nativeDir/libk61223.so", "run")
                     ExploitKind.CVE66118 -> arrayOf("$nativeDir/libk66118.so", "run")
                     ExploitKind.CVE66127 -> arrayOf("$nativeDir/libk66127.so", "run")
+                    ExploitKind.CVE6689 -> arrayOf("$nativeDir/libk6689.so", "run")
                     ExploitKind.UNSUPPORTED -> null
                 } ?: run {
                     withContext(Dispatchers.Main) {
@@ -3815,6 +3819,7 @@ class MainActivity : ComponentActivity() {
         CVE61223("CVE-2026-98260-vivo-6.12.23"),
         CVE66118("CVE-2026-98260-6.6.118"),
         CVE66127("CVE-2026-98260-vivo-6.6.127"),
+        CVE6689("CVE-2026-98260-6.6.89"),
         UNSUPPORTED("Unsupported Device")
     }
 
