@@ -2334,7 +2334,10 @@ class MainActivity : ComponentActivity() {
                 fi
                 echo ""
                 echo "=== READ-ONLY PROBE TEST ==="
-                if [ -x "$nativeDir/libk66118.so" ] && echo "$kernelVersion" | grep -q "6.6.118"; then
+                if [ -x "$nativeDir/libk61230.so" ] && echo "$kernelVersion" | grep -q "6.12.30"; then
+                    echo "Executing libk61230.so probe:"
+                    "$nativeDir/libk61230.so" probe 2>&1
+                elif [ -x "$nativeDir/libk66118.so" ] && echo "$kernelVersion" | grep -q "6.6.118"; then
                     echo "Executing libk66118.so probe:"
                     "$nativeDir/libk66118.so" probe 2>&1
                 elif [ -x "$nativeDir/libk61258.so" ] && echo "$kernelVersion" | grep -q "6.12.58"; then
@@ -3697,6 +3700,7 @@ class MainActivity : ComponentActivity() {
                     )
                     ExploitKind.CVE61269 -> arrayOf("$nativeDir/libk61269.so", "run")
                     ExploitKind.CVE61238 -> arrayOf("$nativeDir/libk61238.so", "run")
+                    ExploitKind.CVE61230 -> arrayOf("$nativeDir/libk61230.so", "run")
                     ExploitKind.CVE61258 -> arrayOf(
                         if (BuildConfig.VIVO_IQOO_SUPPORT)
                             "$nativeDir/libk61258.so"
@@ -3806,6 +3810,7 @@ class MainActivity : ComponentActivity() {
         CVE61821("CVE-2026-98260-6.18"),
         CVE61269("CVE-2026-98260-6.12.69"),
         CVE61238("CVE-2026-98260-6.12.38"),
+        CVE61230("CVE-2026-98260-6.12.30"),
         CVE61258("CVE-2026-98260-6.12.58"),
         CVE61223("CVE-2026-98260-vivo-6.12.23"),
         CVE66118("CVE-2026-98260-6.6.118"),
@@ -3874,7 +3879,11 @@ class MainActivity : ComponentActivity() {
     /** The OPPO anti-root actions are meaningless on the Xiaomi-port kernels. */
     private fun isXiaomiPortKernel(): Boolean =
         kernelVersion == "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k" ||
-            kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k"
+            kernelVersion == "6.18.21-android17-5-g284297031c53-abogki555938958-4k" ||
+            exploit == ExploitKind.CVE61230 ||
+            Build.MANUFACTURER.equals("xiaomi", ignoreCase = true) ||
+            Build.BRAND.equals("poco", ignoreCase = true) ||
+            Build.BRAND.equals("redmi", ignoreCase = true)
 
     private fun isMotorolaDevice(): Boolean =
         Build.MANUFACTURER.equals("motorola", ignoreCase = true)
