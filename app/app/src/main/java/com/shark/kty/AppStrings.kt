@@ -474,10 +474,10 @@ object AppStrings {
     }
 
     fun communitySummary(lang: AppLanguage): String = when (lang) {
-        AppLanguage.ZH -> "GitHub 讨论与问题反馈"
-        AppLanguage.RU -> "Обсуждения и поддержка на GitHub"
-        AppLanguage.PT -> "Discussões e suporte no GitHub"
-        else -> "GitHub Discussions & Support"
+        AppLanguage.ZH -> "Telegram 交流与支持群组"
+        AppLanguage.RU -> "Группа поддержки в Telegram"
+        AppLanguage.PT -> "Grupo de suporte no Telegram"
+        else -> "Telegram Group & Support"
     }
 
     fun reportIssues(lang: AppLanguage): String = when (lang) {
@@ -980,6 +980,13 @@ object AppStrings {
         AppLanguage.RU -> "Создать заявку на GitHub"
         AppLanguage.PT -> "Abrir Issue no GitHub"
         else -> "Create GitHub Issue"
+    }
+
+    fun actionJoinTelegramSupport(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "加入 Telegram 支持群组"
+        AppLanguage.RU -> "Группа поддержки в Telegram"
+        AppLanguage.PT -> "Entrar no Grupo do Telegram"
+        else -> "Join Telegram Support Group"
     }
 
     fun actionCopyDiagnostic(lang: AppLanguage): String = when (lang) {
