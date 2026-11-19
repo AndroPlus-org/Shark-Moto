@@ -2,6 +2,7 @@ package com.shark.kty
 
 import android.content.Context
 import android.content.pm.PackageManager
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -32,9 +33,20 @@ sealed interface UpdateCheckResult {
 }
 
 object UpdateChecker {
-    private const val GITHUB_API =
+    private const val GITHUB_STABLE_API =
         "https://api.github.com/repos/CYB3R0ID694/Shark-Moto/releases/latest"
+    private const val GITHUB_BETA_API =
+        "https://api.github.com/repos/CYB3R0ID694/Shark-Moto/releases"
     private const val USER_AGENT = "Shark-Updater"
+
+    fun isBetaChannel(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("pyb110", Context.MODE_PRIVATE)
+        val betaToggle = prefs.getBoolean("beta_channel", false)
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: ""
+        return betaToggle || versionName.contains("Test", ignoreCase = true) || versionName.contains("Beta", ignoreCase = true)
+    }
 
     suspend fun check(context: Context): UpdateCheckResult = withContext(Dispatchers.IO) {
         val current = context.packageManager
@@ -42,9 +54,14 @@ object UpdateChecker {
             .versionName
             ?: return@withContext UpdateCheckResult.Failed
         val currentParts = parseVersion(current)
+        val betaMode = isBetaChannel(context)
         var fetched = false
 
-        val github = runCatching { fetch(GITHUB_API, "GitHub", false) }.getOrNull()
+        val github = runCatching {
+            if (betaMode) fetchBeta(GITHUB_BETA_API)
+            else fetch(GITHUB_STABLE_API, "GitHub", false)
+        }.getOrNull()
+
         if (github != null) {
             fetched = true
             if (compareVersion(parseVersion(github.version), currentParts) > 0) {
@@ -52,6 +69,19 @@ object UpdateChecker {
             }
         }
         if (fetched) UpdateCheckResult.UpToDate else UpdateCheckResult.Failed
+    }
+
+    private fun fetchBeta(api: String): UpdateInfo? {
+        val conn = (URL(api).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 5000
+            readTimeout = 10000
+            setRequestProperty("User-Agent", USER_AGENT)
+            setRequestProperty("Accept", "application/vnd.github+json")
+        }
+        val body = conn.inputStream.bufferedReader().use { it.readText() }
+        val array = JSONArray(body)
+        if (array.length() == 0) return null
+        return parseReleaseJson(array.getJSONObject(0), "GitHub (Beta)", allowPrerelease = true)
     }
 
     private fun fetch(api: String, source: String, gitee: Boolean): UpdateInfo? {
@@ -63,7 +93,11 @@ object UpdateChecker {
         }
         val body = conn.inputStream.bufferedReader().use { it.readText() }
         val json = JSONObject(body)
-        if (json.optBoolean("prerelease", false)) return null
+        return parseReleaseJson(json, source, allowPrerelease = false)
+    }
+
+    private fun parseReleaseJson(json: JSONObject, source: String, allowPrerelease: Boolean): UpdateInfo? {
+        if (!allowPrerelease && json.optBoolean("prerelease", false)) return null
 
         val tag = json.optString("tag_name").ifBlank { json.optString("name") }
         val version = tag.removePrefix("v").removePrefix("V")

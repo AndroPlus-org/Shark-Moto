@@ -924,4 +924,132 @@ object AppStrings {
         AppLanguage.PT -> "Tentar novamente"
         else -> "Retry"
     }
+
+    // Kernel Diagnostic & Device Support
+    fun kernelDiagnosticTitle(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "内核诊断与设备适配"
+        AppLanguage.RU -> "Диагностика ядра и адаптация"
+        AppLanguage.PT -> "Diagnóstico de Kernel e Suporte"
+        else -> "Kernel Diagnostic & Support"
+    }
+
+    fun kernelDiagnosticSummary(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "通过 Shizuku 自动采集内核特征并一键提交 GitHub Issue"
+        AppLanguage.RU -> "Сбор параметров ядра через Shizuku и отправка issue на GitHub"
+        AppLanguage.PT -> "Colete dados do kernel via Shizuku e envie issue no GitHub"
+        else -> "Inspect kernel parameters via Shizuku & request support on GitHub"
+    }
+
+    fun unsupportedKernelBannerTitle(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "当前内核尚未适配"
+        AppLanguage.RU -> "Текущее ядро не поддерживается"
+        AppLanguage.PT -> "Kernel atual não suportado"
+        else -> "Unsupported Kernel Detected"
+    }
+
+    fun unsupportedKernelBannerDesc(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "点击此处通过 Shizuku 执行自动化诊断，并将参数提交至 GitHub 请求添加支持。"
+        AppLanguage.RU -> "Нажмите здесь для запуска диагностики через Shizuku и отправки запроса на GitHub."
+        AppLanguage.PT -> "Toque aqui para executar o diagnóstico via Shizuku e solicitar suporte no GitHub."
+        else -> "Tap here to run automated Shizuku diagnostics and generate a GitHub support request."
+    }
+
+    fun actionDiagnoseAndReport(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "运行诊断并请求适配"
+        AppLanguage.RU -> "Диагностика и запрос поддержки"
+        AppLanguage.PT -> "Diagnosticar e Solicitar Suporte"
+        else -> "Diagnose & Request Support"
+    }
+
+    fun actionRunDiagnostic(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "开始诊断 (Shizuku)"
+        AppLanguage.RU -> "Запустить диагностику (Shizuku)"
+        AppLanguage.PT -> "Iniciar Diagnóstico (Shizuku)"
+        else -> "Run Diagnostic (Shizuku)"
+    }
+
+    fun actionRunningDiagnostic(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "正在执行诊断命令..."
+        AppLanguage.RU -> "Выполнение диагностики..."
+        AppLanguage.PT -> "Executando diagnóstico..."
+        else -> "Running diagnostic..."
+    }
+
+    fun actionSubmitGithubIssue(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "提交至 GitHub Issue"
+        AppLanguage.RU -> "Создать заявку на GitHub"
+        AppLanguage.PT -> "Abrir Issue no GitHub"
+        else -> "Create GitHub Issue"
+    }
+
+    fun actionCopyDiagnostic(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "复制诊断报告"
+        AppLanguage.RU -> "Скопировать отчет"
+        AppLanguage.PT -> "Copiar Relatório"
+        else -> "Copy Diagnostic Report"
+    }
+
+    fun diagnosticCopied(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "诊断报告已复制到剪贴板！"
+        AppLanguage.RU -> "Отчет о диагностике скопирован в буфер!"
+        AppLanguage.PT -> "Relatório de diagnóstico copiado!"
+        else -> "Diagnostic report copied to clipboard!"
+    }
+
+    fun diagnosticStatusSupported(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "内核已支持"
+        AppLanguage.RU -> "Ядро поддерживается"
+        AppLanguage.PT -> "Kernel suportado"
+        else -> "Kernel Supported"
+    }
+
+    fun diagnosticStatusUnsupported(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "内核未在官方支持列表中"
+        AppLanguage.RU -> "Ядро отсутствует в списке поддержки"
+        AppLanguage.PT -> "Kernel não está na lista de suporte"
+        else -> "Kernel Unsupported (Candidate for Port)"
+    }
+
+    // Beta Channel & Dynamic Profile Sync
+    fun betaChannel(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "Beta 测试通道"
+        AppLanguage.RU -> "Канал тестирования Beta"
+        AppLanguage.PT -> "Canal de Testes Beta"
+        else -> "Beta Testing Channel"
+    }
+
+    fun betaChannelSummary(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "接收测试版本与抢先体验更新"
+        AppLanguage.RU -> "Получать экспериментальные сборки и предварительные версии"
+        AppLanguage.PT -> "Receber compilações experimentais e versões prévias"
+        else -> "Receive experimental builds and pre-releases"
+    }
+
+    fun syncProfiles(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "同步云端内核配置"
+        AppLanguage.RU -> "Синхронизировать профили ядра"
+        AppLanguage.PT -> "Sincronizar Perfis Online"
+        else -> "Sync Online Profiles"
+    }
+
+    fun syncProfilesSummary(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "从 GitHub 获取最新的设备支持配置"
+        AppLanguage.RU -> "Получить свежие профили устройств с GitHub"
+        AppLanguage.PT -> "Baixar perfis de dispositivos mais recentes do GitHub"
+        else -> "Fetch latest device profiles from GitHub"
+    }
+
+    fun syncProfilesSuccess(count: Int, lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "成功同步 $count 个内核配置！"
+        AppLanguage.RU -> "Синхронизировано профилей: $count!"
+        AppLanguage.PT -> "$count perfis sincronizados com sucesso!"
+        else -> "Successfully synchronized $count kernel profiles!"
+    }
+
+    fun syncProfilesFailed(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "同步云端配置失败，请检查网络"
+        AppLanguage.RU -> "Ошибка синхронизации профилей, проверьте сеть"
+        AppLanguage.PT -> "Falha ao sincronizar perfis, verifique a conexão"
+        else -> "Failed to sync profiles, check network"
+    }
 }
