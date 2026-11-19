@@ -982,6 +982,13 @@ object AppStrings {
         else -> "Create GitHub Issue"
     }
 
+    fun actionJoinTelegramSupport(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "加入 Telegram 支持群组"
+        AppLanguage.RU -> "Группа поддержки в Telegram"
+        AppLanguage.PT -> "Entrar no Grupo do Telegram"
+        else -> "Join Telegram Support Group"
+    }
+
     fun actionCopyDiagnostic(lang: AppLanguage): String = when (lang) {
         AppLanguage.ZH -> "复制诊断报告"
         AppLanguage.RU -> "Скопировать отчет"

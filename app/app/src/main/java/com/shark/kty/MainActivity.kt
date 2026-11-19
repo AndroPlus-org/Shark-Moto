@@ -2282,6 +2282,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun openTelegramSupport() {
+        copyDiagnosticReport()
+        val tgUrl = "https://t.me/sharkmotosupport"
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(tgUrl)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        }.onFailure {
+            Toast.makeText(this@MainActivity, "Could not open link", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun runShizukuDiagnostic() {
         if (diagnosticRunning) return
         if (!binderReady || !authorized) {
@@ -2344,7 +2357,7 @@ class MainActivity : ComponentActivity() {
                     "$nativeDir/libk61821x.so" probe 2>&1
                 else
                     echo "No matched native engine probe available for this kernel version."
-                    echo "Please submit diagnostic output to GitHub to request support profile."
+                    echo "Please submit diagnostic output to Telegram or GitHub to request support profile."
                 fi
             """.trimIndent()
 
@@ -2512,6 +2525,14 @@ class MainActivity : ComponentActivity() {
                             title = AppStrings.actionSubmitGithubIssue(appLanguage),
                             summary = "Generate and open pre-filled issue on CYB3R0ID694/Shark-Moto",
                             onClick = { submitGithubIssue() },
+                            trailing = { Chevron() }
+                        )
+                        Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                        SettingItem(
+                            icon = Icons.Filled.Share,
+                            title = AppStrings.actionJoinTelegramSupport(appLanguage),
+                            summary = "https://t.me/sharkmotosupport (Direct community help)",
+                            onClick = { openTelegramSupport() },
                             trailing = { Chevron() }
                         )
                     }
