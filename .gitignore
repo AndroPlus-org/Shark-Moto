@@ -22,6 +22,7 @@ keystore/
 # Build output
 out/
 release-*/
+test-build/
 
 # V2505A local OTA extracts and analysis inputs
 ports/v2505a/.cache/

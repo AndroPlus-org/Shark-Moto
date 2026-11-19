@@ -297,6 +297,12 @@ class MainActivity : ComponentActivity() {
     private var tab by mutableStateOf(AppTab.HOME)
     private var showManual by mutableStateOf(false)
     private var showExtras by mutableStateOf(false)
+    private var showDiagnostic by mutableStateOf(false)
+    private var diagnosticRunning by mutableStateOf(false)
+    private var diagnosticOutput by mutableStateOf("")
+    private var betaChannel by mutableStateOf(false)
+    private var syncingProfiles by mutableStateOf(false)
+    private var dynamicProfileCount by mutableStateOf(0)
     private var legalAccepted by mutableStateOf(false)
     private var languageChosen by mutableStateOf(false)
     private var appLanguage by mutableStateOf(AppLanguage.EN)
@@ -488,6 +494,9 @@ class MainActivity : ComponentActivity() {
         languageChosen = prefs.getBoolean("language_chosen", legalAccepted)
         amoledBlack = prefs.getBoolean("amoled_black", false)
         safeModeModules = prefs.getBoolean("safe_mode_modules", false)
+        DynamicProfileManager.init(applicationContext)
+        dynamicProfileCount = DynamicProfileManager.profileCount()
+        betaChannel = prefs.getBoolean("beta_channel", UpdateChecker.isBetaChannel(this))
         val savedManager = prefs.getString("manager", null)
         manager = runCatching { ManagerKind.valueOf(savedManager ?: "") }.getOrDefault(ManagerKind.KERNELSU)
         kernelVersion = runCatching { android.system.Os.uname().release }.getOrDefault("Unknown")
@@ -905,15 +914,16 @@ class MainActivity : ComponentActivity() {
         }
         val dark = CouiTheme.isDark
         val scheme = CouiTheme.colorScheme
-        val overlayVisible = showManual || showExtras
+        val overlayVisible = showManual || showExtras || showDiagnostic
         BackHandler(
-            enabled = aboutLicense != null || showManual || showExtras ||
+            enabled = aboutLicense != null || showManual || showExtras || showDiagnostic ||
                 (tab == AppTab.ABOUT && aboutPage == AboutPage.LICENSES)
         ) {
             when {
                 aboutLicense != null -> aboutLicense = null
                 showManual -> showManual = false
                 showExtras -> showExtras = false
+                showDiagnostic -> showDiagnostic = false
                 tab == AppTab.ABOUT && aboutPage == AboutPage.LICENSES -> aboutPage = AboutPage.HOME
             }
         }
@@ -922,6 +932,7 @@ class MainActivity : ComponentActivity() {
             containerColor = if (amoledBlack && dark) Color.Black else scheme.background,
             topBar = {
                 when {
+                    showDiagnostic -> AppTopBar(AppStrings.kernelDiagnosticTitle(appLanguage), onBack = { showDiagnostic = false })
                     showExtras -> AppTopBar(AppStrings.titleExtras(appLanguage), onBack = { showExtras = false })
                     showManual -> AppTopBar(AppStrings.titleManual(appLanguage), onBack = { showManual = false })
                     tab == AppTab.ABOUT && aboutPage == AboutPage.LICENSES ->
@@ -979,6 +990,20 @@ class MainActivity : ComponentActivity() {
                             .pointerInput(Unit) { detectTapGestures { } }
                     ) {
                         ExtrasScreen(inner)
+                    }
+                }
+                AnimatedVisibility(
+                    visible = showDiagnostic,
+                    enter = slideInHorizontally(tween(240)) { it } + fadeIn(tween(240)),
+                    exit = slideOutHorizontally(tween(240)) { it } + fadeOut(tween(240))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(CouiTheme.colorScheme.background)
+                            .pointerInput(Unit) { detectTapGestures { } }
+                    ) {
+                        DiagnosticScreen(inner)
                     }
                 }
             }
@@ -1664,6 +1689,11 @@ class MainActivity : ComponentActivity() {
             item {
                 StatusCard(granted = binderReady && authorized)
             }
+            if (exploit == ExploitKind.UNSUPPORTED) {
+                item {
+                    UnsupportedKernelBanner(onClick = { showDiagnostic = true })
+                }
+            }
             item {
                 PrimaryActionCard()
             }
@@ -1678,6 +1708,47 @@ class MainActivity : ComponentActivity() {
                     fingerprint = Build.FINGERPRINT,
                     selinux = selinuxText
                 )
+            }
+        }
+    }
+
+    @Composable
+    private fun UnsupportedKernelBanner(onClick: () -> Unit) {
+        val dark = CouiTheme.isDark
+        val colors = CouiPageDefaults.themeColors(dark)
+        val amberBg = if (dark) Color(0xFF332500) else Color(0xFFFFF8E1)
+        val amberTint = Color(0xFFFFB300)
+
+        Group(colors = colors.copy(card = amberBg)) {
+            Item(
+                onClick = onClick,
+                trailing = { Chevron() }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AppIcon(
+                        icon = Icons.Filled.BugReport,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                        tint = amberTint
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = AppStrings.unsupportedKernelBannerTitle(appLanguage),
+                            kind = CouiTextKind.SectionTitle,
+                            color = colors.title
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = AppStrings.unsupportedKernelBannerDesc(appLanguage),
+                            kind = CouiTextKind.PreferenceSummary,
+                            color = colors.summary
+                        )
+                    }
+                }
             }
         }
     }
@@ -1737,6 +1808,7 @@ class MainActivity : ComponentActivity() {
             busy -> AppStrings.actionRunning(appLanguage)
             !binderReady -> AppStrings.actionStellarNotRunning(appLanguage)
             !authorized -> AppStrings.actionAuthorizeShizuku(appLanguage)
+            exploit == ExploitKind.UNSUPPORTED -> AppStrings.actionDiagnoseAndReport(appLanguage)
             ksuActive -> AppStrings.actionReRoot(appLanguage)
             else -> AppStrings.actionOneClickRoot(appLanguage)
         }
@@ -1750,6 +1822,9 @@ class MainActivity : ComponentActivity() {
                                 PrivService.openManager(applicationContext)
                             }
                             !authorized -> PrivService.request(REQ_SHIZUKU)
+                            exploit == ExploitKind.UNSUPPORTED -> {
+                                showDiagnostic = true
+                            }
                             else -> runFlow()
                         }
                     }
@@ -1790,6 +1865,14 @@ class MainActivity : ComponentActivity() {
                 title = AppStrings.manual(appLanguage),
                 summary = AppStrings.manualSummary(appLanguage),
                 onClick = { showManual = true },
+                trailing = { Chevron() }
+            )
+            Divider(startIndent = itemDividerIndent())
+            SettingItem(
+                icon = Icons.Filled.BugReport,
+                title = AppStrings.kernelDiagnosticTitle(appLanguage),
+                summary = AppStrings.kernelDiagnosticSummary(appLanguage),
+                onClick = { showDiagnostic = true },
                 trailing = { Chevron() }
             )
         }
@@ -2036,6 +2119,14 @@ class MainActivity : ComponentActivity() {
                     )
                     Divider(startIndent = itemDividerIndent(), color = colors.divider)
                     SettingItem(
+                        icon = Icons.Filled.BugReport,
+                        title = AppStrings.kernelDiagnosticTitle(appLanguage),
+                        summary = AppStrings.kernelDiagnosticSummary(appLanguage),
+                        onClick = { showDiagnostic = true },
+                        trailing = { Chevron() }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
                         icon = Icons.Filled.Share,
                         title = AppStrings.exportKernelInfo(appLanguage),
                         onClick = {
@@ -2051,6 +2142,23 @@ class MainActivity : ComponentActivity() {
                             cm?.setPrimaryClip(ClipData.newPlainText("Shark Kernel Info", info))
                             Toast.makeText(this@MainActivity, AppStrings.kernelInfoCopied(appLanguage), Toast.LENGTH_SHORT).show()
                         }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingSwitchItem(
+                        icon = Icons.Filled.Extension,
+                        title = AppStrings.betaChannel(appLanguage),
+                        summary = AppStrings.betaChannelSummary(appLanguage),
+                        checked = betaChannel,
+                        onCheckedChange = { toggleBetaChannel(it) }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
+                        icon = Icons.Filled.Download,
+                        title = if (syncingProfiles) AppStrings.actionRunningDiagnostic(appLanguage) else AppStrings.syncProfiles(appLanguage),
+                        summary = "${AppStrings.syncProfilesSummary(appLanguage)} (${dynamicProfileCount} active)",
+                        onClick = { syncProfilesOnline() },
+                        enabled = !syncingProfiles,
+                        trailing = { Chevron() }
                     )
                 }
             }
@@ -2078,6 +2186,332 @@ class MainActivity : ComponentActivity() {
                             icon = Icons.Filled.Download,
                             title = "Download Module",
                             onClick = { openDroidspacesDialog() },
+                            trailing = { Chevron() }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /* ===== Diagnostic & Device Support ===== */
+
+    private fun toggleBetaChannel(enabled: Boolean) {
+        betaChannel = enabled
+        getSharedPreferences("pyb110", MODE_PRIVATE).edit().putBoolean("beta_channel", enabled).apply()
+        Toast.makeText(
+            this,
+            if (enabled) "Switched to Beta update channel" else "Switched to Stable update channel",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun syncProfilesOnline() {
+        if (syncingProfiles) return
+        syncingProfiles = true
+        lifecycleScope.launch {
+            val result = DynamicProfileManager.syncRemote(applicationContext)
+            syncingProfiles = false
+            result.onSuccess { count ->
+                dynamicProfileCount = count
+                val newKind = JailbreakCore.kindFor(kernelVersion)?.let {
+                    runCatching { ExploitKind.valueOf(it) }.getOrNull()
+                } ?: ExploitKind.UNSUPPORTED
+                exploit = newKind
+                Toast.makeText(this@MainActivity, AppStrings.syncProfilesSuccess(count, appLanguage), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this@MainActivity, AppStrings.syncProfilesFailed(appLanguage), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun copyDiagnosticReport() {
+        val cm = getSystemService(ClipboardManager::class.java)
+        val fullReport = """
+            # Shark-Moto Device Diagnostic Report
+            Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})
+            Brand: ${Build.BRAND}
+            Fingerprint: ${Build.FINGERPRINT}
+            Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}, Patch ${Build.VERSION.SECURITY_PATCH})
+            Kernel: $kernelVersion
+            SELinux: $selinuxText
+            Shark: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})
+            Support Status: ${if (exploit != ExploitKind.UNSUPPORTED) "Supported (${exploit.fullLabel})" else "UNSUPPORTED"}
+
+            --- Shell Diagnostic Output ---
+            $diagnosticOutput
+        """.trimIndent()
+        cm?.setPrimaryClip(ClipData.newPlainText("Shark Diagnostic", fullReport))
+        Toast.makeText(this@MainActivity, AppStrings.diagnosticCopied(appLanguage), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun submitGithubIssue() {
+        copyDiagnosticReport()
+        val repo = "CYB3R0ID694/Shark-Moto"
+        val title = "[Device Support] ${Build.MANUFACTURER} ${Build.MODEL} ($kernelVersion)"
+        val cleanOutput = diagnosticOutput.take(1200)
+        val body = """
+            ### Device & Kernel Information
+            - **Device**: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})
+            - **Android Version**: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})
+            - **Security Patch**: ${Build.VERSION.SECURITY_PATCH}
+            - **Kernel (`uname -r`)**: `$kernelVersion`
+            - **Fingerprint**: `${Build.FINGERPRINT}`
+
+            ### Diagnostic Output (via Shizuku)
+            ```text
+            $cleanOutput
+            ```
+
+            > [!NOTE]
+            > Full diagnostic output was also automatically copied to the clipboard. Please paste below if needed.
+        """.trimIndent()
+
+        val url = "https://github.com/$repo/issues/new?title=" +
+            java.net.URLEncoder.encode(title, "UTF-8") +
+            "&body=" +
+            java.net.URLEncoder.encode(body, "UTF-8")
+
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        }.onFailure {
+            Toast.makeText(this@MainActivity, "Could not open browser", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun runShizukuDiagnostic() {
+        if (diagnosticRunning) return
+        if (!binderReady || !authorized) {
+            Toast.makeText(this, AppStrings.actionAuthorizeShizuku(appLanguage), Toast.LENGTH_SHORT).show()
+            return
+        }
+        diagnosticRunning = true
+        diagnosticOutput = AppStrings.actionRunningDiagnostic(appLanguage)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val nativeDir = applicationInfo.nativeLibraryDir
+            val script = """
+                echo "=== SYSTEM & KERNEL BANNER ==="
+                echo "Release: $(uname -r)"
+                echo "Version: $(cat /proc/version 2>/dev/null || uname -v)"
+                echo "Machine: $(uname -m)"
+                echo ""
+                echo "=== DEVICE BUILD PROPERTIES ==="
+                echo "Manufacturer: $(getprop ro.product.manufacturer)"
+                echo "Brand: $(getprop ro.product.brand)"
+                echo "Model: $(getprop ro.product.model)"
+                echo "Device: $(getprop ro.product.device)"
+                echo "Board: $(getprop ro.board.platform)"
+                echo "Fingerprint: $(getprop ro.build.fingerprint)"
+                echo "Android: $(getprop ro.build.version.release) (SDK $(getprop ro.build.version.sdk))"
+                echo "Security Patch: $(getprop ro.build.version.security_patch)"
+                echo ""
+                echo "=== SELINUX & TRACING CONFIG ==="
+                echo "SELinux Mode: $(getenforce 2>/dev/null || echo unknown)"
+                echo "Tracing buffer_size_kb: $(cat /sys/kernel/tracing/buffer_size_kb 2>/dev/null || echo 'unreadable')"
+                echo "Trace events dir: $(if [ -d /sys/kernel/tracing/events ]; then echo 'accessible'; else echo 'restricted'; fi)"
+                echo ""
+                echo "=== KALLSYMS ACCESSIBILITY ==="
+                if [ -r /proc/kallsyms ]; then
+                    echo "kallsyms: readable ($(head -n 2 /proc/kallsyms 2>/dev/null | tr '\n' ' '))"
+                else
+                    echo "kallsyms: restricted (normal for unrooted user)"
+                fi
+                echo ""
+                echo "=== READ-ONLY PROBE TEST ==="
+                if [ -x "$nativeDir/libk66118.so" ] && echo "$kernelVersion" | grep -q "6.6.118"; then
+                    echo "Executing libk66118.so probe:"
+                    "$nativeDir/libk66118.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61258.so" ] && echo "$kernelVersion" | grep -q "6.12.58"; then
+                    echo "Executing libk61258.so probe:"
+                    "$nativeDir/libk61258.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61258x.so" ] && echo "$kernelVersion" | grep -q "6.12.58"; then
+                    echo "Executing libk61258x.so probe:"
+                    "$nativeDir/libk61258x.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61238.so" ] && echo "$kernelVersion" | grep -q "6.12.38"; then
+                    echo "Executing libk61238.so probe:"
+                    "$nativeDir/libk61238.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61269.so" ] && echo "$kernelVersion" | grep -q "6.12.69"; then
+                    echo "Executing libk61269.so probe:"
+                    "$nativeDir/libk61269.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61821p.so" ] && echo "$kernelVersion" | grep -q "6.18.21"; then
+                    echo "Executing libk61821p.so probe:"
+                    "$nativeDir/libk61821p.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61821x.so" ] && echo "$kernelVersion" | grep -q "6.18.21"; then
+                    echo "Executing libk61821x.so probe:"
+                    "$nativeDir/libk61821x.so" probe 2>&1
+                else
+                    echo "No matched native engine probe available for this kernel version."
+                    echo "Please submit diagnostic output to GitHub to request support profile."
+                fi
+            """.trimIndent()
+
+            val result = runCatching {
+                val p = PrivService.newProcess(arrayOf("sh", "-c", script), shizukuEnv(), "/")
+                val out = p.getInputStream().bufferedReader().readText().trim()
+                val err = p.getErrorStream().bufferedReader().readText().trim()
+                p.waitFor()
+                if (err.isNotEmpty()) "$out\n[STDERR]\n$err" else out
+            }.getOrElse { "Failed to run Shizuku diagnostic: ${it.message}" }
+
+            withContext(Dispatchers.Main) {
+                diagnosticOutput = result
+                diagnosticRunning = false
+            }
+        }
+    }
+
+    @Composable
+    private fun DiagnosticScreen(inner: PaddingValues) {
+        val colors = CouiPageDefaults.themeColors()
+        val dark = CouiTheme.isDark
+        val isSupported = exploit != ExploitKind.UNSUPPORTED
+        val statusText = if (isSupported) {
+            "${AppStrings.diagnosticStatusSupported(appLanguage)} (${exploit.fullLabel})"
+        } else {
+            AppStrings.diagnosticStatusUnsupported(appLanguage)
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = inner.calculateTopPadding() + 4.dp,
+                bottom = inner.calculateBottomPadding() + 16.dp
+            )
+        ) {
+            item {
+                Group {
+                    SettingItem(
+                        icon = Icons.Filled.Smartphone,
+                        title = "$deviceModel (${Build.MANUFACTURER})",
+                        summary = "Android ${Build.VERSION.RELEASE} (Patch: ${Build.VERSION.SECURITY_PATCH})"
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
+                        icon = Icons.Filled.DeveloperBoard,
+                        title = "Kernel: $kernelVersion",
+                        summary = statusText
+                    )
+                }
+            }
+
+            item {
+                Group {
+                    if (!binderReady) {
+                        SettingItem(
+                            icon = Icons.Filled.HealthAndSafety,
+                            title = AppStrings.actionStellarNotRunning(appLanguage),
+                            summary = "Tap to open Shizuku / Stellar manager",
+                            onClick = { PrivService.openManager(applicationContext) },
+                            trailing = { Chevron() }
+                        )
+                    } else if (!authorized) {
+                        SettingItem(
+                            icon = Icons.Filled.HealthAndSafety,
+                            title = AppStrings.actionAuthorizeShizuku(appLanguage),
+                            summary = "Tap to grant shell permission to Shark",
+                            onClick = { PrivService.request(REQ_SHIZUKU) },
+                            trailing = { Chevron() }
+                        )
+                    } else {
+                        SettingItem(
+                            icon = Icons.Filled.Check,
+                            title = "Shizuku Shell Access Granted",
+                            summary = "Backend UID 2000 (Ready for inspection)"
+                        )
+                    }
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
+                        icon = if (diagnosticRunning) Icons.Filled.Schedule else Icons.Filled.Refresh,
+                        title = if (diagnosticRunning) AppStrings.actionRunningDiagnostic(appLanguage) else AppStrings.actionRunDiagnostic(appLanguage),
+                        summary = "Inspect kernel, KASLR alignment, tracing & run read-only probe",
+                        onClick = { runShizukuDiagnostic() },
+                        enabled = !diagnosticRunning && binderReady && authorized,
+                        trailing = { Chevron() }
+                    )
+                    Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                    SettingItem(
+                        icon = Icons.Filled.Download,
+                        title = if (syncingProfiles) AppStrings.actionRunningDiagnostic(appLanguage) else AppStrings.syncProfiles(appLanguage),
+                        summary = "${AppStrings.syncProfilesSummary(appLanguage)} (${dynamicProfileCount} active)",
+                        onClick = { syncProfilesOnline() },
+                        enabled = !syncingProfiles,
+                        trailing = { Chevron() }
+                    )
+                }
+            }
+
+            if (diagnosticOutput.isNotEmpty()) {
+                item {
+                    Group {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Diagnostic Console",
+                                    kind = CouiTextKind.SectionTitle,
+                                    color = colors.title
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(colors.accent.copy(alpha = 0.1f))
+                                        .clickable { copyDiagnosticReport() }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = AppStrings.actionCopyDiagnostic(appLanguage),
+                                        kind = CouiTextKind.Category,
+                                        color = colors.accent
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            SelectionContainer {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (dark) Color(0xFF121212) else Color(0xFFF1F3F4))
+                                        .padding(12.dp)
+                                ) {
+                                    BasicText(
+                                        text = diagnosticOutput,
+                                        style = rememberCouiTextStyle(CouiTextKind.Body).copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            color = if (dark) Color(0xFF00E676) else Color(0xFF007A33)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Group {
+                        SettingItem(
+                            icon = Icons.Filled.ContentCopy,
+                            title = AppStrings.actionCopyDiagnostic(appLanguage),
+                            summary = "Copy full log output to clipboard",
+                            onClick = { copyDiagnosticReport() }
+                        )
+                        Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                        SettingItem(
+                            icon = Icons.Filled.Forum,
+                            title = AppStrings.actionSubmitGithubIssue(appLanguage),
+                            summary = "Generate and open pre-filled issue on CYB3R0ID694/Shark-Moto",
+                            onClick = { submitGithubIssue() },
                             trailing = { Chevron() }
                         )
                     }

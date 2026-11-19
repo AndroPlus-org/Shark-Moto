@@ -63,7 +63,7 @@ object JailbreakCore {
             return null
         if (!BuildConfig.VIVO_61821_SUPPORT && release == PD2606_RELEASE)
             return null
-        return PROFILE_BY_RELEASE[release]
+        return PROFILE_BY_RELEASE[release] ?: DynamicProfileManager.lookup(release)?.engine
     }
 
     fun isPlantCore61821(release: String): Boolean =
