@@ -253,6 +253,76 @@ object AppStrings {
         else -> "Home"
     }
 
+    fun tabDevices(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "设备"
+        AppLanguage.RU -> "Устройства"
+        AppLanguage.PT -> "Dispositivos"
+        else -> "Devices"
+    }
+
+    fun supportedDevicesTitle(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "支持设备列表"
+        AppLanguage.RU -> "Поддерживаемые устройства"
+        AppLanguage.PT -> "Dispositivos Suportados"
+        else -> "Supported Devices"
+    }
+
+    fun supportedDevicesCount(count: Int, lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "共支持 $count 款设备与适配内核"
+        AppLanguage.RU -> "Поддерживается устройств: $count"
+        AppLanguage.PT -> "$count dispositivos suportados"
+        else -> "$count Devices Supported"
+    }
+
+    fun copiedKernel(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "内核版本号已复制到剪贴板！"
+        AppLanguage.RU -> "Версия ядра скопирована в буфер!"
+        AppLanguage.PT -> "Versão do kernel copiada!"
+        else -> "Kernel release copied to clipboard!"
+    }
+
+    fun activeKernelMatch(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "当前设备运行的内核 (完全匹配)"
+        AppLanguage.RU -> "Текущее ядро устройства (совпадает)"
+        AppLanguage.PT -> "Kernel ativo deste aparelho (compatível)"
+        else -> "Active Kernel (Matches This Device)"
+    }
+
+    fun searchDevicesPlaceholder(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "搜索设备或内核版本..."
+        AppLanguage.RU -> "Поиск устройства или ядра..."
+        AppLanguage.PT -> "Buscar dispositivo ou kernel..."
+        else -> "Search device or kernel..."
+    }
+
+    fun thisDeviceHeader(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "本机状态"
+        AppLanguage.RU -> "Текущее устройство"
+        AppLanguage.PT -> "Este Dispositivo"
+        else -> "Current Device"
+    }
+
+    fun thisDeviceStatusSupported(engine: String, lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "已支持 ($engine)"
+        AppLanguage.RU -> "Поддерживается ($engine)"
+        AppLanguage.PT -> "Suportado ($engine)"
+        else -> "Supported ($engine)"
+    }
+
+    fun thisDeviceStatusUnsupported(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "暂未适配 • 点击运行诊断"
+        AppLanguage.RU -> "Не поддерживается • Нажмите для диагностики"
+        AppLanguage.PT -> "Não suportado • Toque para diagnosticar"
+        else -> "Unsupported • Tap to diagnose"
+    }
+
+    fun noDevicesFound(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ZH -> "未找到匹配的设备或内核"
+        AppLanguage.RU -> "Ничего не найдено"
+        AppLanguage.PT -> "Nenhum dispositivo encontrado"
+        else -> "No matching devices found"
+    }
+
     fun tabLogs(lang: AppLanguage): String = when (lang) {
         AppLanguage.ZH -> "日志"
         AppLanguage.RU -> "Логи"

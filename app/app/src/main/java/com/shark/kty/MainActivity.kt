@@ -73,6 +73,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Copyright
@@ -94,6 +95,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RemoveModerator
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Smartphone
@@ -938,7 +940,13 @@ class MainActivity : ComponentActivity() {
                     showManual -> AppTopBar(AppStrings.titleManual(appLanguage), onBack = { showManual = false })
                     tab == AppTab.ABOUT && aboutPage == AboutPage.LICENSES ->
                         AppTopBar(AppStrings.titleLicenses(appLanguage), onBack = { aboutPage = AboutPage.HOME })
-                    else -> AppTopBar(if (tab == AppTab.HOME) "Shark" else tab.label(appLanguage))
+                    else -> AppTopBar(
+                        when (tab) {
+                            AppTab.HOME -> "Shark"
+                            AppTab.DEVICES -> AppStrings.supportedDevicesTitle(appLanguage)
+                            else -> tab.label(appLanguage)
+                        }
+                    )
                 }
             },
             bottomBar = {
@@ -960,6 +968,7 @@ class MainActivity : ComponentActivity() {
                 ) { current ->
                     when (current) {
                         AppTab.HOME -> HomeScreen(inner)
+                        AppTab.DEVICES -> DevicesScreen(inner)
                         AppTab.LOGS -> LogScreen(inner)
                         AppTab.HISTORY -> HistoryScreen(inner)
                         AppTab.ABOUT -> AboutScreen(inner)
@@ -2335,7 +2344,10 @@ class MainActivity : ComponentActivity() {
                 fi
                 echo ""
                 echo "=== READ-ONLY PROBE TEST ==="
-                if [ -x "$nativeDir/libk61230.so" ] && echo "$kernelVersion" | grep -q "6.12.30"; then
+                if [ -x "$nativeDir/libk6689.so" ] && echo "$kernelVersion" | grep -q "6.6.89"; then
+                    echo "Executing libk6689.so probe:"
+                    "$nativeDir/libk6689.so" probe 2>&1
+                elif [ -x "$nativeDir/libk61230.so" ] && echo "$kernelVersion" | grep -q "6.12.30"; then
                     echo "Executing libk61230.so probe:"
                     "$nativeDir/libk61230.so" probe 2>&1
                 elif [ -x "$nativeDir/libk66118.so" ] && echo "$kernelVersion" | grep -q "6.6.118"; then
@@ -2359,6 +2371,12 @@ class MainActivity : ComponentActivity() {
                 elif [ -x "$nativeDir/libk61821x.so" ] && echo "$kernelVersion" | grep -q "6.18.21"; then
                     echo "Executing libk61821x.so probe:"
                     "$nativeDir/libk61821x.so" probe 2>&1
+                elif echo "$kernelVersion" | grep -q "6.1\."; then
+                    echo "=== LINUX 6.1 SERIES KERNEL DETECTED ==="
+                    echo "Release: $kernelVersion"
+                    echo "Status: Linux 6.1 (Android 14 GKI) requires dedicated libk61 engine runner."
+                    echo "SELinux mode and tracefs parameters above are recorded for 6.1 porting."
+                    echo "Please share this diagnostic report on Telegram (@sharkmotosupport)."
                 else
                     echo "No matched native engine probe available for this kernel version."
                     echo "Please submit diagnostic output to Telegram or GitHub to request support profile."
@@ -2539,6 +2557,270 @@ class MainActivity : ComponentActivity() {
                             onClick = { openTelegramSupport() },
                             trailing = { Chevron() }
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    /* ===== Supported Devices ===== */
+
+    private data class SupportedDeviceEntry(
+        val brand: String,
+        val name: String,
+        val kernels: List<String>
+    )
+
+    private fun getSupportedDevicesList(): List<SupportedDeviceEntry> {
+        val staticList = listOf(
+            SupportedDeviceEntry(
+                brand = "Motorola",
+                name = "Motorola Edge 70 Pro",
+                kernels = listOf("6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k")
+            ),
+            SupportedDeviceEntry(
+                brand = "Motorola",
+                name = "Motorola Signature",
+                kernels = listOf(
+                    "6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k",
+                    "6.12.58-android16-6-g09eda8c8505a-ab15950084-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "POCO / Xiaomi",
+                name = "Xiaomi POCO M7 Pro (beryl)",
+                kernels = listOf("6.12.30-android16-5-g1ed949324a3e-ab13881345-4k")
+            ),
+            SupportedDeviceEntry(
+                brand = "OnePlus",
+                name = "OnePlus 16 (PYB110)",
+                kernels = listOf(
+                    "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+                    "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "OnePlus",
+                name = "OnePlus 15 / 15T / Ace7 Pro / Ace7 / Ace6 Ultra",
+                kernels = listOf(
+                    "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
+                    "6.12.69-android16-6-g5fd39602326e-ab16372235-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "OnePlus",
+                name = "OnePlus Ace6T (PLR110)",
+                kernels = listOf(
+                    "6.12.38-android16-5-g844001fb8721-ab14552068-4k",
+                    "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
+                    "6.12.69-android16-6-g5fd39602326e-ab16372235-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "OnePlus",
+                name = "OnePlus Ace6 (PLQ110) / Ace5 Pro (PKR110)",
+                kernels = listOf("6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k")
+            ),
+            SupportedDeviceEntry(
+                brand = "OnePlus",
+                name = "OnePlus Pad3 Pro / Pad2 Pro",
+                kernels = listOf(
+                    "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
+                    "6.12.69-android16-6-g5fd39602326e-ab16372235-4k",
+                    "6.12.58-android16-6-g7704a1ae279b-ab15213644-4k",
+                    "6.6.118-android15-8-gc4127a25dcf3-ab15863337-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "OPPO",
+                name = "OPPO Find X9 / X9 Pro / X9 Ultra / X9s Pro / X10",
+                kernels = listOf(
+                    "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
+                    "6.12.69-android16-6-g5fd39602326e-ab16372235-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "OPPO",
+                name = "OPPO Find X8 Ultra / Find N5",
+                kernels = listOf(
+                    "6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k",
+                    "6.6.118-android15-8-gc4127a25dcf3-ab15863337-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "OPPO",
+                name = "OPPO Pad 5 Pro / Pad Mini / Pad4 Pro",
+                kernels = listOf(
+                    "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
+                    "6.12.69-android16-6-g5fd39602326e-ab16372235-4k",
+                    "6.12.58-android16-6-g7704a1ae279b-ab15213644-4k",
+                    "6.6.118-android15-8-gc4127a25dcf3-ab15863337-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "Realme",
+                name = "Realme GT8 / GT8 Pro / GT7 Pro / Neo8",
+                kernels = listOf(
+                    "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
+                    "6.12.69-android16-6-g5fd39602326e-ab16372235-4k",
+                    "6.12.38-android16-5-g844001fb8721-ab14552068-4k",
+                    "6.6.118-android15-8-g9bc34d5b0c79-abogki537459655-4k"
+                )
+            ),
+            SupportedDeviceEntry(
+                brand = "iQOO / Vivo",
+                name = "iQOO 15 (V2505A) / Ultra / Pad Pro",
+                kernels = listOf(
+                    "6.12.58-android16-6-g690108013dcc-abogki576129896-4k",
+                    "6.12.58-android16-6-g0a092cc0037a-abogki521987229-4k",
+                    "6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k",
+                    "6.12.23-android16-5-g41f4cb1fa7c7-abogki465038634-4k",
+                    "6.6.127-android15-8-gd489d4ad2a70-abogki567717946-4k"
+                )
+            )
+        )
+        val knownKernels = staticList.flatMap { it.kernels }.toSet()
+        val dyn = DynamicProfileManager.allProfiles().filter { it.release !in knownKernels }
+        if (dyn.isEmpty()) return staticList
+        val extra = dyn.groupBy { it.model }.map { (model, profs) ->
+            SupportedDeviceEntry("Dynamic Profile", model, profs.map { it.release })
+        }
+        return staticList + extra
+    }
+
+    @Composable
+    private fun DevicesScreen(inner: PaddingValues) {
+        val colors = CouiPageDefaults.themeColors()
+        val scheme = CouiTheme.colorScheme
+        val cm = getSystemService(ClipboardManager::class.java)
+        val devices = remember { getSupportedDevicesList() }
+        var searchQuery by remember { mutableStateOf("") }
+        val isSupported = exploit != ExploitKind.UNSUPPORTED
+
+        val filteredDevices = remember(searchQuery, devices) {
+            val q = searchQuery.trim().lowercase()
+            if (q.isEmpty()) devices
+            else devices.filter { dev ->
+                dev.name.lowercase().contains(q) ||
+                    dev.brand.lowercase().contains(q) ||
+                    dev.kernels.any { it.lowercase().contains(q) }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = inner.calculateTopPadding() + 8.dp,
+                bottom = inner.calculateBottomPadding() + 20.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                Group {
+                    SettingItem(
+                        icon = if (isSupported) Icons.Filled.Check else Icons.Filled.Info,
+                        title = "${AppStrings.thisDeviceHeader(appLanguage)}: ${JailbreakCore.resolveDeviceName()}",
+                        summary = if (isSupported) {
+                            "${AppStrings.thisDeviceStatusSupported(exploit.fullLabel, appLanguage)}\n$kernelVersion"
+                        } else {
+                            "${AppStrings.thisDeviceStatusUnsupported(appLanguage)}\n$kernelVersion"
+                        },
+                        onClick = if (!isSupported) {
+                            { showDiagnostic = true }
+                        } else null
+                    )
+                }
+            }
+
+            item {
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .background(scheme.card, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    textStyle = TextStyle(color = scheme.onSurface, fontSize = 14.sp),
+                    singleLine = true,
+                    decorationBox = { innerField ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppIcon(
+                                icon = Icons.Filled.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = scheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Box(modifier = Modifier.weight(1f)) {
+                                if (searchQuery.isEmpty()) {
+                                    Text(
+                                        text = AppStrings.searchDevicesPlaceholder(appLanguage),
+                                        kind = CouiTextKind.Description,
+                                        color = scheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                }
+                                innerField()
+                            }
+                            if (searchQuery.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clickable { searchQuery = "" },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AppIcon(
+                                        icon = Icons.Filled.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = scheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            item {
+                Text(
+                    text = AppStrings.supportedDevicesCount(filteredDevices.size, appLanguage),
+                    kind = CouiTextKind.Category,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                )
+            }
+
+            if (filteredDevices.isEmpty()) {
+                item {
+                    Text(
+                        text = AppStrings.noDevicesFound(appLanguage),
+                        kind = CouiTextKind.Description,
+                        color = scheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                    )
+                }
+            } else {
+                items(filteredDevices) { dev ->
+                    Group {
+                        SettingItem(
+                            icon = Icons.Filled.Smartphone,
+                            title = dev.name,
+                            summary = "${dev.brand} • ${dev.kernels.size} kernel build(s)"
+                        )
+                        dev.kernels.forEach { k ->
+                            val isMatched = k == kernelVersion
+                            Divider(startIndent = itemDividerIndent(), color = colors.divider)
+                            SettingItem(
+                                icon = Icons.Filled.DeveloperBoard,
+                                title = k,
+                                summary = if (isMatched) AppStrings.activeKernelMatch(appLanguage) else "Tap to copy kernel string",
+                                onClick = {
+                                    cm?.setPrimaryClip(ClipData.newPlainText("Kernel", k))
+                                    Toast.makeText(this@MainActivity, AppStrings.copiedKernel(appLanguage), Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -3684,6 +3966,13 @@ class MainActivity : ComponentActivity() {
                 ).waitFor()
                 if (ksudPreflight != 0) {
                     addLog("Manager not installed: $targetPkg. Install the manager APK first; ksud is executed from its APK, no bundled copy.")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            applicationContext,
+                            "KernelSU Manager app not installed!\nPlease install KernelSU or KernelSU Next first.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                     return@launch
                 }
                 val nativeDir = applicationInfo.nativeLibraryDir
@@ -3712,6 +4001,7 @@ class MainActivity : ComponentActivity() {
                     ExploitKind.CVE61223 -> arrayOf("$nativeDir/libk61223.so", "run")
                     ExploitKind.CVE66118 -> arrayOf("$nativeDir/libk66118.so", "run")
                     ExploitKind.CVE66127 -> arrayOf("$nativeDir/libk66127.so", "run")
+                    ExploitKind.CVE6689 -> arrayOf("$nativeDir/libk6689.so", "run")
                     ExploitKind.UNSUPPORTED -> null
                 } ?: run {
                     withContext(Dispatchers.Main) {
@@ -3795,12 +4085,14 @@ class MainActivity : ComponentActivity() {
 
     private enum class AppTab(val icon: ImageVector) {
         HOME(Icons.Filled.Home),
+        DEVICES(Icons.Filled.Smartphone),
         LOGS(Icons.Filled.Notes),
         HISTORY(Icons.Filled.History),
         ABOUT(Icons.Filled.Info);
 
         fun label(lang: AppLanguage): String = when (this) {
             HOME -> AppStrings.tabHome(lang)
+            DEVICES -> AppStrings.tabDevices(lang)
             LOGS -> AppStrings.tabLogs(lang)
             HISTORY -> AppStrings.tabHistory(lang)
             ABOUT -> AppStrings.tabAbout(lang)
@@ -3816,6 +4108,7 @@ class MainActivity : ComponentActivity() {
         CVE61223("CVE-2026-98260-vivo-6.12.23"),
         CVE66118("CVE-2026-98260-6.6.118"),
         CVE66127("CVE-2026-98260-vivo-6.6.127"),
+        CVE6689("CVE-2026-98260-6.6.89"),
         UNSUPPORTED("Unsupported Device")
     }
 
@@ -3887,7 +4180,9 @@ class MainActivity : ComponentActivity() {
             Build.BRAND.equals("redmi", ignoreCase = true)
 
     private fun isMotorolaDevice(): Boolean =
-        Build.MANUFACTURER.equals("motorola", ignoreCase = true)
+        Build.MANUFACTURER.equals("motorola", ignoreCase = true) ||
+            Build.BRAND.equals("motorola", ignoreCase = true) ||
+            exploit == ExploitKind.CVE6689
 
     private fun hidesOplusOnlyOptions(): Boolean =
         isVivoV2505a() || isXiaomiPortKernel() || isMotorolaDevice()

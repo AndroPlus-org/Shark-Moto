@@ -79,6 +79,8 @@ object DynamicProfileManager {
 
     fun profileCount(): Int = profiles.size
 
+    fun allProfiles(): List<DynamicKernelProfile> = profiles.values.toList()
+
     suspend fun syncRemote(context: Context): Result<Int> = withContext(Dispatchers.IO) {
         runCatching {
             val conn = (URL(REMOTE_URL).openConnection() as HttpURLConnection).apply {

@@ -16,6 +16,21 @@
       "init_ucounts": "0xffffffc0821accb0",
       "init_groups": "0xffffffc0821ac740",
       "site_mask": "0xffff"
+    },
+    {
+      "release": "6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k",
+      "model": "Motorola Edge 70 Pro (merc)",
+      "engine": "CVE6689",
+      "timer_site": "0xffffffc080193b40",
+      "timer_low21": "0x193b40",
+      "copy_low21": "0x0aa5e0",
+      "selinux_state": "0xffffffc082336ea0",
+      "panic_on_warn": "0xffffffc0820eae08",
+      "root_user": "0xffffffc08210efe0",
+      "init_user_ns": "0xffffffc08210ed50",
+      "init_ucounts": "0xffffffc082110ab0",
+      "init_groups": "0xffffffc082110540",
+      "site_mask": "0x1fffff"
     }
   ]
 }

@@ -43,7 +43,8 @@ object JailbreakCore {
         "6.6.118-android15-8-gc4127a25dcf3-ab15863337-4k" to "CVE66118",
         "6.6.118-android15-8-gb1422e39c313-abogki552867473-4k" to "CVE66118",
         "6.6.127-android15-8-gd489d4ad2a70-abogki567717946-4k" to "CVE66127",
-        "6.12.58-android16-6-g690108013dcc-abogki576129896-4k" to "CVE61258"
+        "6.12.58-android16-6-g690108013dcc-abogki576129896-4k" to "CVE61258",
+        "6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k" to "CVE6689"
     )
 
     /* Devices whose support is only shipped in the full (vivo) build. */
@@ -86,7 +87,14 @@ object JailbreakCore {
         "CVE61223" -> "$nativeDir/libk61223.so"
         "CVE66118" -> "$nativeDir/libk66118.so"
         "CVE66127" -> "$nativeDir/libk66127.so"
+        "CVE6689" -> "$nativeDir/libk6689.so"
         else -> null
+    }
+
+    fun kmiFor(kind: String, release: String): String = when (kind) {
+        "CVE6689", "CVE66118", "CVE66127" -> "android15-6.6"
+        "CVE61821" -> "android17-6.18"
+        else -> "android16-6.12"
     }
 
     fun isGateKernel(kind: String, release: String): Boolean =
@@ -96,7 +104,7 @@ object JailbreakCore {
                 (release.contains("gdd6fd5c98918") || release.contains("g690108013dcc")))
 
     fun supportsSusfs(kind: String, gate: Boolean): Boolean =
-        !gate && kind != "CVE66118" && kind != "CVE66127" && kind != "UNSUPPORTED"
+        !gate && kind != "CVE66118" && kind != "CVE66127" && kind != "CVE6689" && kind != "UNSUPPORTED"
 
     fun supportsUniversal(kind: String): Boolean =
         kind == "CVE61821" || kind == "CVE61269" || kind == "CVE61238" || kind == "CVE61230" ||
@@ -248,6 +256,7 @@ object JailbreakCore {
             "PATH=/system/bin:/system/xbin:/data/adb/ksu/bin",
             "HOME=/",
             "PYB110_DIR=$dir",
+            "PYB110_KMI=${kmiFor(cfg.kind, cfg.release)}",
             "PYB110_MANAGER=${runtime.first}",
             "PYB110_MANAGER_PKG=$managerPkg",
             "PYB110_LATE_LOAD=1",
