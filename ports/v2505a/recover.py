@@ -89,11 +89,15 @@ class Image:
                 p += l
             return syms, p
 
-        # markers array ends where the token table starts
+        # markers array ends where the token table starts.  Newer kallsyms
+        # emit one extra 0 sentinel between the markers and the token table.
         end = S
-        mvals, p = [], end - 4
+        p = end - 4
         prev = struct.unpack_from('<I', d, p)[0]
-        mvals.append(prev)
+        if prev == 0 and p >= 4:
+            p -= 4
+            prev = struct.unpack_from('<I', d, p)[0]
+        mvals = [prev]
         while p - 4 >= 0:
             v = struct.unpack_from('<I', d, p - 4)[0]
             if v >= prev or v > 0x4000000:
@@ -265,6 +269,12 @@ def main():
     for h in hits:
         print('  bl->kmem_cache_alloc_noprof @%#x  site(idx+1)=%#x  low21=%#x  '
               'func+%#x' % (h, h + 4, (h + 4) & 0x1fffff, h - st))
+    if im.addr('alloc_posix_timer'):
+        st4, hits4 = im.bl_from('alloc_posix_timer', km)
+        print('alloc_posix_timer = %#x' % st4)
+        for h in hits4:
+            print('  bl->kmem_cache_alloc_noprof @%#x  site(idx+1)=%#x  low21=%#x  '
+                  'func+%#x' % (h, h + 4, (h + 4) & 0x1fffff, h - st4))
     st2, hits2 = im.bl_from('copy_process', kmn)
     print('copy_process = %#x' % st2)
     for h in hits2:

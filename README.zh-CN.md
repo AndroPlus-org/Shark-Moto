@@ -69,7 +69,7 @@ SukiSU Ultra 或 FinaSU 的 root 环境。
 | iQOO Pad6 Pro | OriginOS 7 | `6.12.58-android16-6-gdd6fd5c98918-abogki543627742-4k` |
 | Motorola Signature | Android 17 | `6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k`<br>`6.12.58-android16-6-g09eda8c8505a-ab15950084-4k` |
 | Motorola Edge 70 Pro | Android 16 | `6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k` |
-| HONOR WIN Pad (HES-W00) (preliminary) | MagicOS 11 / Android 17 | `6.12.81-android16-6-g52d15df5db87-abogki576042287-4k` |
+| HONOR WIN Pad (HES-W00) | MagicOS 11 / Android 17 | `6.12.81-android16-6-g52d15df5db87-abogki576042287-4k` |
 
 ## 支持的管理器
 

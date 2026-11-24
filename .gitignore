@@ -29,6 +29,8 @@ ports/v2505a/.cache/
 ports/v2505a/work/
 ports/v2505a/artifacts/
 ports/v2505a/bin/
+/boot.img
+/boot_out/
 ports/v2505a/logs/
 ports/v2505a/app/
 ports/v2505a/**/__pycache__/
