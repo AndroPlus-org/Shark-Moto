@@ -170,6 +170,12 @@ that the release string matched and tracefs is readable. They do **not** test
 the allocation site. The decisive line is `[calib] timers=N`: on a vendor
 layout difference it is `timers=0` and the plant exits before any write.
 
+The page chase is disabled for this kernel (`set_chase_pfn_filter()` is
+rejected, so it would spend 12 s blind). A burst miss instead parks the
+zombie and retries with a fresh plant, up to 5 attempts per stage
+(`PLANT_RECLAIM_RETRY 1`). If a run ends in `FAIL_EXIT=... holder=...`,
+reboot before the next run so no stale holder/zombie remains.
+
 Expected:
 
 ```text

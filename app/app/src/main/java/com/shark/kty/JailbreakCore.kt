@@ -113,7 +113,8 @@ object JailbreakCore {
             kind == "CVE61258" || kind == "CVE61223" || kind == "CVE61281"
 
     fun supportsChaseRetry(kind: String, release: String): Boolean =
-        kind != "UNSUPPORTED" && !(kind == "CVE61821" && !isPlantCore61821(release))
+        kind != "UNSUPPORTED" && kind != "CVE61281" &&
+            !(kind == "CVE61821" && !isPlantCore61821(release))
 
     fun isVivoOemDevice(): Boolean =
         Build.MANUFACTURER.equals("vivo", ignoreCase = true) ||
@@ -267,7 +268,7 @@ object JailbreakCore {
             "PYB110_DISABLE_ANTIROOT=${if (cfg.antiRootGuard && !Build.MANUFACTURER.equals("motorola", ignoreCase = true)) "1" else "0"}",
             "PYB110_SUSFS=${if (susfsActive) "1" else "0"}",
             "PYB110_VFS=${if (cfg.vfsSupport) "1" else "0"}",
-            "PYB110_CHASE=${if (cfg.chaseRetry) "1" else "0"}",
+            "PYB110_CHASE=${if (cfg.chaseRetry && supportsChaseRetry(cfg.kind, cfg.release)) "1" else "0"}",
             "PYB110_UNIVERSAL=${if (cfg.universal) "1" else "0"}",
             "PYB110_UNIVERSAL_KSUD=$nativeDir/libksud_universal.so",
             "PYB110_FILES_DIR=${context.filesDir.absolutePath}",
