@@ -44,7 +44,8 @@ object JailbreakCore {
         "6.6.118-android15-8-gb1422e39c313-abogki552867473-4k" to "CVE66118",
         "6.6.127-android15-8-gd489d4ad2a70-abogki567717946-4k" to "CVE66127",
         "6.12.58-android16-6-g690108013dcc-abogki576129896-4k" to "CVE61258",
-        "6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k" to "CVE6689"
+        "6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k" to "CVE6689",
+        "6.12.81-android16-6-g52d15df5db87-abogki576042287-4k" to "CVE61281"
     )
 
     /* Devices whose support is only shipped in the full (vivo) build. */
@@ -88,6 +89,7 @@ object JailbreakCore {
         "CVE66118" -> "$nativeDir/libk66118.so"
         "CVE66127" -> "$nativeDir/libk66127.so"
         "CVE6689" -> "$nativeDir/libk6689.so"
+        "CVE61281" -> "$nativeDir/libk61281.so"
         else -> null
     }
 
@@ -108,7 +110,7 @@ object JailbreakCore {
 
     fun supportsUniversal(kind: String): Boolean =
         kind == "CVE61821" || kind == "CVE61269" || kind == "CVE61238" || kind == "CVE61230" ||
-            kind == "CVE61258" || kind == "CVE61223"
+            kind == "CVE61258" || kind == "CVE61223" || kind == "CVE61281"
 
     fun supportsChaseRetry(kind: String, release: String): Boolean =
         kind != "UNSUPPORTED" && !(kind == "CVE61821" && !isPlantCore61821(release))

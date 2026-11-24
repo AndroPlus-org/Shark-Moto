@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-20T00:00:00Z",
+  "updated_at": "2026-11-24T00:00:00Z",
   "profiles": [
     {
       "release": "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k",
@@ -30,6 +30,21 @@
       "init_user_ns": "0xffffffc08210ed50",
       "init_ucounts": "0xffffffc082110ab0",
       "init_groups": "0xffffffc082110540",
+      "site_mask": "0x1fffff"
+    },
+    {
+      "release": "6.12.81-android16-6-g52d15df5db87-abogki576042287-4k",
+      "model": "HONOR WIN Pad (HES-W00)",
+      "engine": "CVE61281",
+      "timer_site": "0xffffffc0802cadac",
+      "timer_low21": "0xcadac",
+      "copy_low21": "0xc9fa4",
+      "selinux_state": "0xffffffc0828fdb08",
+      "panic_on_warn": "0xffffffc08264ade0",
+      "root_user": "0xffffffc082672348",
+      "init_user_ns": "0xffffffc0826720d0",
+      "init_ucounts": "0xffffffc082673ce0",
+      "init_groups": "0xffffffc082673810",
       "site_mask": "0x1fffff"
     }
   ]

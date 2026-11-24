@@ -2579,6 +2579,11 @@ class MainActivity : ComponentActivity() {
                 kernels = listOf("6.6.89-android15-8-gdcee9aa4fcbc-ab14676413-4k")
             ),
             SupportedDeviceEntry(
+                brand = "HONOR",
+                name = "HONOR WIN Pad (HES-W00)",
+                kernels = listOf("6.12.81-android16-6-g52d15df5db87-abogki576042287-4k")
+            ),
+            SupportedDeviceEntry(
                 brand = "Motorola",
                 name = "Motorola Signature",
                 kernels = listOf(
@@ -3989,6 +3994,7 @@ class MainActivity : ComponentActivity() {
                         "run"
                     )
                     ExploitKind.CVE61269 -> arrayOf("$nativeDir/libk61269.so", "run")
+                    ExploitKind.CVE61281 -> arrayOf("$nativeDir/libk61281.so", "run")
                     ExploitKind.CVE61238 -> arrayOf("$nativeDir/libk61238.so", "run")
                     ExploitKind.CVE61230 -> arrayOf("$nativeDir/libk61230.so", "run")
                     ExploitKind.CVE61258 -> arrayOf(
@@ -4102,6 +4108,7 @@ class MainActivity : ComponentActivity() {
     private enum class ExploitKind(val fullLabel: String) {
         CVE61821("CVE-2026-98260-6.18"),
         CVE61269("CVE-2026-98260-6.12.69"),
+        CVE61281("CVE-2026-98260-6.12.81"),
         CVE61238("CVE-2026-98260-6.12.38"),
         CVE61230("CVE-2026-98260-6.12.30"),
         CVE61258("CVE-2026-98260-6.12.58"),
@@ -4184,8 +4191,13 @@ class MainActivity : ComponentActivity() {
             Build.BRAND.equals("motorola", ignoreCase = true) ||
             exploit == ExploitKind.CVE6689
 
+    private fun isHonorDevice(): Boolean =
+        Build.MANUFACTURER.equals("honor", ignoreCase = true) ||
+            Build.BRAND.equals("honor", ignoreCase = true) ||
+            exploit == ExploitKind.CVE61281
+
     private fun hidesOplusOnlyOptions(): Boolean =
-        isVivoV2505a() || isXiaomiPortKernel() || isMotorolaDevice()
+        isVivoV2505a() || isXiaomiPortKernel() || isMotorolaDevice() || isHonorDevice()
 
     /** OriginOS 7 builds load the KSU LKM through the hooks_defend gate. */
     private fun isGateKernel(): Boolean =
